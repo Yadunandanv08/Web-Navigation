@@ -5,7 +5,7 @@ from agent_pipeline.Agent.GroqClient import GroqClient
 
 tools = [get_dateTime, get_age]
 agent = Agent(
-    llm_client=GeminiClient(),
+    llm_client=GroqClient(),
     tools=tools, 
     max_iterations=10, 
     show_thinking=True,
