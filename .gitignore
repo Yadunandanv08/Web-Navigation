@@ -97,3 +97,6 @@ cython_debug/
 *.log
 *.tmp
 *.swp
+
+# Junk files
+MCP/

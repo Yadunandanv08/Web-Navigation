@@ -38,9 +38,10 @@ import json
 from google import genai
 from dotenv import load_dotenv
 from typing import List, Dict
+import inspect
+import asyncio
 
 from agent_pipeline.Agent.AbstractLLM import AbstractLLMClient
-from agent_pipeline.utils.chat_completions import chat_completion
 from agent_pipeline.Tool_Execution.parse_tool_call import generate_available_tools, parse_tool_call
 from agent_pipeline.utils.parser import extract_tagged_content
 from agent_pipeline.utils.logger import Logger
@@ -102,7 +103,10 @@ class Agent:
                 if tool_call and tool_call["name"] in self.function_map:
                     function_to_call = self.function_map[tool_call["name"]]
                     print(f"Calling tool: {tool_call['name']} with arguments {tool_call['arguments']}")
-                    tool_result = function_to_call(**tool_call["arguments"])
+                    if inspect.iscoroutinefunction(function_to_call):
+                        tool_result = asyncio.run(function_to_call(**tool_call["arguments"]))
+                    else:
+                        tool_result = function_to_call(**tool_call["arguments"])
 
                     scratchpad += f"\nObservation {i+1}: You used the tool '{tool_call['name']}' with arguments {tool_call['arguments']}.\n"
                     scratchpad += f"Tool Result: {tool_result}\n"

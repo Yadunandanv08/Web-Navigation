@@ -1,11 +1,12 @@
-from agent_pipeline.Tool_Execution.tools import get_age, get_dateTime
+from Navigation.playwright_tools import open_page, click_element, type_in_element, press_key, get_element
 from agent_pipeline.Agent.Agent import Agent
-from agent_pipeline.Agent.GeminiClient import GeminiClient
 from agent_pipeline.Agent.GroqClient import GroqClient
+from agent_pipeline.Agent.GeminiClient import GeminiClient
+from agent_pipeline.Agent.OpenRouterClient import OpenRouterClient
 
-tools = [get_dateTime, get_age]
+tools = [open_page, click_element, type_in_element, press_key, get_element]
 agent = Agent(
-    llm_client=GroqClient(),
+    llm_client=OpenRouterClient(),
     tools=tools, 
     max_iterations=10, 
     show_thinking=True,
