@@ -11,7 +11,7 @@ class NavigationTools:
         """
 
         try:
-            # self.session.start()
+            self.session.start()
             page = self.session.get_page()
 
             if not url.startswith("http"):

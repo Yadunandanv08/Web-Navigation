@@ -7,9 +7,9 @@ from Navigation.Tools.perception import PerceptionTools
 from Navigation.Tools.navigate import NavigationTools
 from Navigation.Browser.manager import BrowserManager
 from Navigation.Tools.Models.element_store import ElementStore
+# from Navigation.playwright_tools import open_page, get_element, click_element, type_in_element, press_key
 
 session = BrowserManager(headless=False)
-session.start()
 
 
 navigation_tools = NavigationTools(session)
@@ -19,18 +19,20 @@ action_tools = ActionTools(session, element_store)
 
 tools = [
             navigation_tools.open_page, 
-            navigation_tools.close_browser, 
             perception_tools.take_snapshot, 
             action_tools.click_element,
             action_tools.type_in_element,
-            action_tools.press_key
+            action_tools.press_key,
+            action_tools.mark_checked
         ]
+
+
 agent = Agent(
     llm_client=OpenRouterClient(),
     tools=tools, 
     max_iterations=10, 
     show_thinking=True,
-    system_prompt="You are a helpful AI assistant that helps users navigate the web using browser automation. Use the provided tools to open web pages, take snapshots of the accessibility tree, click elements, type into elements, and press keys as needed to fulfill user requests."  
+    system_prompt="You are a helpful AI assistant."  
     )
 
 while True:
@@ -39,3 +41,6 @@ while True:
         break
     result = agent.run(user_query)
     print(f"Agent: {result['final_response']}")
+
+import time
+time.sleep(300)

@@ -19,11 +19,6 @@ class ActionTools:
                 name=element.name
             )
 
-            count = locator.count()
-            if count > 1:
-                locator.first.click()
-                return {"status": "warning", "message": f"Found {count} elements for '{element.name}'. Clicked the first one."}
-            
             locator.click()
             return {"status": "ok"}
             
@@ -59,3 +54,47 @@ class ActionTools:
             return {"status": "ok"}
         except Exception as e:
             return {"status": "error", "reason": str(e)}
+        
+
+
+    def mark_checked(self, element_id: str):
+        """
+        Marks a checkbox or radio button as checked.
+        """
+
+        try:
+            element = self.element_store.get(element_id)
+            page = self.session.get_page()
+
+            if element.role not in ("checkbox", "radio"):
+                return {
+                    "status": "error",
+                    "reason": f"check_element not supported for role '{element.role}'"
+                }
+            
+            locator = page.get_by_role(
+                element.role,
+                name=element.name,
+                exact=False
+            ).first
+
+            if locator.is_checked():
+                return {
+                    "status": "ok",
+                    "message": "Element already checked"
+                }
+            
+            locator.click(timeout=10000)
+
+            if not locator.is_checked():
+                return {
+                    "status": "error",
+                    "reason": "Failed to check element"
+                }
+
+            return {"status": "ok"}
+        
+
+        except Exception as e:
+            return {"status": "error", "reason": str(e)}
+        
