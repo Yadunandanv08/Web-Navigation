@@ -63,7 +63,8 @@ class PerceptionTools:
         
             interactive_roles = {
                 "button", "link", "textbox", "checkbox", "radio", 
-                "combobox", "listbox", "tab", "menuitem", "switch"
+                "combobox", "listbox", "tab", "menuitem", "switch",
+                "heading", "paragraph", "alert", "StaticText", "text"
             }
             
             is_interactive = (role in interactive_roles and name) 

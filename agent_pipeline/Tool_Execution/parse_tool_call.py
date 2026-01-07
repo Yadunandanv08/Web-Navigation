@@ -2,10 +2,16 @@ import json
 import inspect
 from typing import get_type_hints, Annotated
 
-def parse_tool_call(tool_call: str) -> dict:
-    
-    json_str = tool_call.split("<tool_call>")[1].split("</tool_call>")[0]
-    return json.loads(json_str)
+def parse_tool_call(tool_call: str) -> dict | None:
+    if "<tool_call>" not in tool_call or "</tool_call>" not in tool_call:
+        return None
+
+    try:
+        json_str = tool_call.split("<tool_call>", 1)[1].split("</tool_call>", 1)[0]
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        return None
+
 
 def generate_available_tools(tools_list: list) -> str:
     tool_definitions = []

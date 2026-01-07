@@ -63,15 +63,15 @@ class Agent:
         
 
     def _call_llm(self, prompt: str) -> str:
-        if self.system_prompt and (not self.llm_client.history):
-            self.llm_client.history.append({"role": "system", "content": self.system_prompt})
 
-        self.llm_client.history.append({"role": "user", "content": prompt})
+        messages = []
 
-        response = self.llm_client.generate_response(prompt, self.llm_client.history)
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
 
-        
-        self.llm_client.history.append({"role": "assistant", "content": response})
+        messages.append({"role": "user", "content": prompt})
+
+        response = self.llm_client.generate_response(prompt, messages)
 
         return response
     

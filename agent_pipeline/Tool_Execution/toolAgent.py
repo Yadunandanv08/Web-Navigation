@@ -5,7 +5,6 @@ from agent_pipeline.Tool_Execution.parse_tool_call import parse_tool_call, gener
 
 load_dotenv()
 
-from agent_pipeline.utils.chat_completions import chat_completion
 from agent_pipeline.utils.logger import Logger
 
 
