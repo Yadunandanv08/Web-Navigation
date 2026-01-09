@@ -1,6 +1,7 @@
 from Navigation.Browser.manager import BrowserManager
 from Navigation.Tools.Models.element_store import ElementStore
 
+
 class ActionTools:
     def __init__(self, session: BrowserManager, element_store: ElementStore):
         self.session = session
@@ -14,33 +15,58 @@ class ActionTools:
             element = self.element_store.get(element_id)
             page = self.session.get_page()
 
-            locator = page.get_by_role(
-                element.role,
-                name=element.name
-            )
-
+            locator = page.locator(element.selector)
+            
+            locator.scroll_into_view_if_needed()
             locator.click()
-            return {"status": "ok"}
+            return {"status": "success"}
             
         except Exception as e:
-            print(f"Error clicking element: {str(e)}")
             return {"status": "error", "reason": str(e)}
-        
-    def type_in_element(self, element_id:str, text: str):
+
+    def type_in_element(self, element_id: str, text: str):
         """
         Types text into specified element by its ID.
         """
         try:
             element = self.element_store.get(element_id)
             page = self.session.get_page()
-
-            locator = page.get_by_role(
-                element.role,
-                name=element.name
-            )
-
+            
+            locator = page.locator(element.selector)
             locator.fill(text)
-            return {"status": "ok"}
+            return {"status": "success"}
+        except Exception as e:
+            return {"status": "error", "reason": str(e)}
+
+    def set_date(self, element_id: str, date_str: str):
+        """
+        Handles standard date inputs and Google Form style text-dates.
+        """
+        try:
+            element = self.element_store.get(element_id)
+            page = self.session.get_page()
+            locator = page.locator(element.selector)
+            
+            if element.attributes.get('type') == 'date':
+                locator.fill(date_str)
+                return {"status": "success", "method": "native_date_input"}
+            
+            
+            try:
+                locator.click()
+                locator.fill(date_str)
+                page.keyboard.press("Enter")
+                return {"status": "success", "method": "text_fill"}
+            except:
+                pass
+
+            page.evaluate(
+                "(element, value) => { element.value = value; element.dispatchEvent(new Event('input', {bubbles: true})); element.dispatchEvent(new Event('change', {bubbles: true})); }", 
+                locator.element_handle(), 
+                date_str
+            )
+            return {"status": "success", "method": "js_injection"}
+
         except Exception as e:
             return {"status": "error", "reason": str(e)}
         
@@ -55,8 +81,6 @@ class ActionTools:
         except Exception as e:
             return {"status": "error", "reason": str(e)}
         
-
-
     def mark_checked(self, element_id: str):
         """
         Marks a checkbox or radio button as checked.
@@ -93,8 +117,6 @@ class ActionTools:
                 }
 
             return {"status": "ok"}
-        
-
         except Exception as e:
             return {"status": "error", "reason": str(e)}
-        
+            

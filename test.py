@@ -66,7 +66,8 @@ execution_agent = Agent(
                 action_tools.click_element,    
                 action_tools.type_in_element, 
                 action_tools.press_key, 
-                action_tools.mark_checked
+                action_tools.mark_checked, 
+                action_tools.set_date
             ],
     max_iterations=25,
     show_thinking=True,
@@ -100,7 +101,7 @@ def call_perception_agent(query: str):
 
 def call_execution_agent(instruction: str, element_id: str=None, input_text: str = None):
     """
-    Calls the execution agent with the given instruction and or element_id.
+    Calls the execution agent with the given instruction(such as opening a page or performing an action) and or element_id.
     """
 
     tool_input = {
@@ -153,6 +154,16 @@ Orchestrator = Agent(
         Agents must respond using:
         status, reason (if failure), outputs (if success)
 
+        ### THE "REALITY GAP" PROTOCOL
+        1. **Thoughts ≠ Actions:** Describing an action in your thought process (e.g., "I will click the button") does NOT make it happen. 
+        2. **Tool Output is the Only Proof:** You can only confirm an action is complete when you receive a concrete output/log from the `call_execution_agent` tool.
+        3. **No Batch Hallucination:** If a plan requires multiple distinct interactions (e.g., filling 3 fields, clicking 2 links), you must execute them individually (or via a batch tool) and **wait for the tool output** for each.
+        
+        ### COMPLETION CRITERIA
+        You are strictly FORBIDDEN from outputting a Final Response or claiming "Task Complete" until:
+        1. You have delegated the necessary actions to the Execution Agent.
+        2. You have received a "SUCCESS" or data payload return from the Execution Agent for those specific actions.
+
     """
 )
 
@@ -163,3 +174,17 @@ while True:
         break
     result = Orchestrator.run(user_query)
     print(f"Orchestrator: {result['final_response']}")
+
+
+
+"""
+
+i need u to fill this google form for me: https://docs.google.com/forms/d/e/1FAIpQLSe_nn_5k-5-GMe5h6J9lF_-G8wuluhGSGWh10frU_nOn7tDOQ/viewform?usp=dialog.  Name: Yadunandan, email: yadunandanv08@gmail.com phone:6238922215, DOB: 3 JAN 2004, currently a btech student final year, i know python and im a good problem solver, i expect 5 lakhs per annum salary
+
+
+Open this google form https://docs.google.com/forms/d/e/1FAIpQLSe_nn_5k-5-GMe5h6J9lF_-G8wuluhGSGWh10frU_nOn7tDOQ/viewform?usp=dialog and fill my date of birth 3 jan 2004.
+"""
+
+
+# navigation_tools.open_page("https://docs.google.com/forms/d/e/1FAIpQLSe_nn_5k-5-GMe5h6J9lF_-G8wuluhGSGWh10frU_nOn7tDOQ/viewform?usp=dialog")
+# perception_tools.take_snapshot()
