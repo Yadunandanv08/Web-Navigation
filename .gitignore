@@ -100,3 +100,4 @@ cython_debug/
 
 # Junk files
 MCP/
+snapshot.yaml

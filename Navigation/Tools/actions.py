@@ -1,5 +1,5 @@
 from Navigation.Browser.manager import BrowserManager
-from Navigation.Tools.Models.element_store import ElementStore
+from Navigation.Tools.element_store import ElementStore
 
 
 class ActionTools:
@@ -7,22 +7,33 @@ class ActionTools:
         self.session = session
         self.element_store = element_store
     
-    def click_element(self, element_id: str):
-        """
-        Clicks on specified element by its ID.
-        """
-        try:
-            element = self.element_store.get(element_id)
-            page = self.session.get_page()
 
-            locator = page.locator(element.selector)
+    def click_element(self, element_id):
+        element = self.element_store.get(element_id)
+        page = self.session.get_page()
+
+        try:
+        
+            if element.tag_name == "a" and element.attributes.get("href"):
+                page.goto(element.attributes["href"])
+                return {"status": "success", "method": "goto"}
+
             
+            locator = page.locator(element.selector).first
+            locator.wait_for(state="visible", timeout=3000)
             locator.scroll_into_view_if_needed()
-            locator.click()
-            return {"status": "success"}
-            
-        except Exception as e:
-            return {"status": "error", "reason": str(e)}
+            locator.click(force=True, timeout=3000)
+
+            return {"status": "success", "method": "dom_click"}
+
+        except Exception:
+            if element.text:
+                page.get_by_text(element.text, exact=False).first.click(force=True)
+                return {"status": "success", "method": "text_fallback"}
+
+            raise
+
+
 
     def type_in_element(self, element_id: str, text: str):
         """
@@ -40,7 +51,7 @@ class ActionTools:
 
     def set_date(self, element_id: str, date_str: str):
         """
-        Handles standard date inputs and Google Form style text-dates.
+        Sets the date in a date input field.
         """
         try:
             element = self.element_store.get(element_id)
@@ -83,40 +94,40 @@ class ActionTools:
         
     def mark_checked(self, element_id: str):
         """
-        Marks a checkbox or radio button as checked.
+        Marks a checkbox or radio button as checked (ARIA-safe).
         """
-
         try:
             element = self.element_store.get(element_id)
             page = self.session.get_page()
 
-            if element.role not in ("checkbox", "radio"):
+            role = element.attributes.get("role")
+
+            if role not in ("checkbox", "radio"):
                 return {
                     "status": "error",
-                    "reason": f"check_element not supported for role '{element.role}'"
+                    "reason": f"check_element not supported for role '{role}'"
                 }
-            
-            locator = page.get_by_role(
-                element.role,
-                name=element.name,
-                exact=False
-            ).first
 
-            if locator.is_checked():
+            locator = page.locator(element.selector).first
+            locator.wait_for(state="visible", timeout=10000)
+
+            is_checked = locator.get_attribute("aria-checked") == "true"
+
+            if is_checked:
                 return {
                     "status": "ok",
                     "message": "Element already checked"
                 }
-            
+
             locator.click(timeout=10000)
 
-            if not locator.is_checked():
+            if locator.get_attribute("aria-checked") != "true":
                 return {
                     "status": "error",
                     "reason": "Failed to check element"
                 }
 
             return {"status": "ok"}
+
         except Exception as e:
             return {"status": "error", "reason": str(e)}
-            

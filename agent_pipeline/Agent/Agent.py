@@ -76,14 +76,21 @@ class Agent:
         return response
     
     def run(self, user_input:str):
-        scratchpad = ""
+        history_log  = []
         available_tools_str = generate_available_tools(self.tools)
 
+        WINDOW_SIZE = 5
+
         for i in range(self.max_iterations):
+
+            if history_log:
+                current_scratchpad = "\n".join(history_log[-WINDOW_SIZE:])
+            else:
+                current_scratchpad = ""
             prompt = ORCHESTRATOR_PROMPT.format(
                 question=user_input,
                 tools=available_tools_str,
-                scratchpad=scratchpad
+                scratchpad=current_scratchpad
             )
 
             llm_response = self._call_llm(prompt)
@@ -95,7 +102,7 @@ class Agent:
 
             final_answer = extract_tagged_content(llm_response, "final_answer")
             if final_answer:
-                return {"final_response": final_answer, "history": scratchpad}
+                return {"final_response": final_answer, "history": history_log}
             
 
             try:
@@ -107,22 +114,23 @@ class Agent:
                         tool_result = asyncio.run(function_to_call(**tool_call["arguments"]))
                     else:
                         tool_result = function_to_call(**tool_call["arguments"])
-
-                    scratchpad += f"\nObservation {i+1}: You used the tool '{tool_call['name']}' with arguments {tool_call['arguments']}.\n"
-                    scratchpad += f"Tool Result: {tool_result}\n"
+                    
+                    log_entry = (
+                        f"Observation {i+1}: You used the tool '{tool_call['name']}' with arguments {tool_call['arguments']}.\n"
+                        f"Tool Result: {tool_result}" # 
+                    )
+                    history_log.append(log_entry)
 
                 else:
-                    scratchpad += f"\nObservation {i+1}: You tried to call an invalid tool or the format was wrong.\n"
-
-
+                    history_log.append(f"Observation {i+1}: You tried to call an invalid tool or the format was wrong.")
 
 
             except Exception as e:
-                scratchpad += f"\nObservation {i+1}: An error occurred while trying to call a tool. Error: {e}\n"
+                history_log.append(f"Observation {i+1}: An error occurred while trying to call a tool. Error: {e}")
                 print(f"Error parsing tool call: {e}")
 
         return {
             "final_response": "I could not complete the task within the given number of steps.",
-            "history": scratchpad
+            "history": history_log
         }
     
