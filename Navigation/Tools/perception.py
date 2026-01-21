@@ -20,29 +20,33 @@ class PerceptionTools:
 
         try:
             raw_snapshot = page.locator("body").aria_snapshot()
-        except Exception as e:
-            return f"Error taking snapshot: {str(e)}"
-        
-        self.element_store.clear()
-        
-        self._parse_and_store(raw_snapshot)
-        
-        data = [
-        {
-            "id": el.id,
-            "role": el.role,
-            "scope": el.scope,
-            "name": el.name,
-            "text": el.text,
-            "parent": el.parent,
-            "states": el.states,
-        }
-        for el in self.element_store.all()
-    ]
-        with open("snapshot.yaml", "w", encoding="utf-8") as f:
-            yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
+            
+            
+            self.element_store.clear()
+            
+            self._parse_and_store(raw_snapshot)
+            
+            data = [
+            {
+                "id": el.id,
+                "role": el.role,
+                "scope": el.scope,
+                "name": el.name,
+                "text": el.text,
+                "parent": el.parent,
+                "states": el.states,
+            }
+            for el in self.element_store.all()
+        ]
+            with open("snapshot.yaml", "w", encoding="utf-8") as f:
+                yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
 
-        return yaml.dump(data, allow_unicode=True, sort_keys=False)
+            return {
+                "status": "success",
+                "message": f"{yaml.dump(data, allow_unicode=True, sort_keys=False)}"
+            }
+        except Exception as e:
+            return {"status": "error", "reason": str(e)}
     
     def _parse_and_store(self, snapshot_text: str) -> None:
         lines = snapshot_text.split('\n')
