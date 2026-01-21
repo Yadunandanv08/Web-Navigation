@@ -5,11 +5,17 @@ from typing import List, Dict, Any, Optional
 from Navigation.Browser.manager import BrowserManager
 from Navigation.Tools.Models.element import Element
 from Navigation.Tools.element_store import ElementStore
+from Rag.retriever import Retriever
+from Rag.embedder import Embedder
 
 class PerceptionTools:
     def __init__(self, session: BrowserManager, element_store: ElementStore):
         self.session = session
         self.element_store = element_store
+
+        #changes
+        self.embedder = Embedder()
+        self.retriever = Retriever(self.embedder)
 
     def take_snapshot(self) -> str:
         """
@@ -27,6 +33,24 @@ class PerceptionTools:
         
         self._parse_and_store(raw_snapshot)
         
+        elements = self.element_store.all()
+        texts_to_index = []
+        metadata = []
+
+     #   summary = []
+        for el in elements:
+            desc = f"Role: {el.role}, Name: {el.name}, Text: {el.text}"
+            texts_to_index.append(desc)
+            metadata.append({"id":el.id,"role":el.role,"name":el.name})
+#
+ #           if el.role in ['textbox', 'combobox', 'button', 'checkbox', 'radio']:
+  #              summary.append(f"- {el.role}: '{el.name or el.text}'")
+
+        self.retriever.index_data(texts_to_index, metadata)
+   #     readable_summary = "\n".join(summary[:15]) # Limit summary size to save tokens
+    #    return f"Snapshot indexed successfully. Discovered elements:\n{readable_summary}\n\nUse retrieve_element for specific IDs."
+
+
         data = [
         {
             "id": el.id,
@@ -39,10 +63,12 @@ class PerceptionTools:
         }
         for el in self.element_store.all()
     ]
-        with open("snapshot.yaml", "w", encoding="utf-8") as f:
-            yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
-
         return yaml.dump(data, allow_unicode=True, sort_keys=False)
+
+    def retrieve_element(self, query: str) -> str:
+        """Finds the most relevant element IDs based on a natural language query."""
+        results = self.retriever.retrieve(query, top_k=3)
+        return yaml.dump(results, allow_unicode=True)
     
     def _parse_and_store(self, snapshot_text: str) -> None:
         lines = snapshot_text.split('\n')

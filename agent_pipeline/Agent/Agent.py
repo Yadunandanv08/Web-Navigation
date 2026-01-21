@@ -79,7 +79,7 @@ class Agent:
         history_log  = []
         available_tools_str = generate_available_tools(self.tools)
 
-        WINDOW_SIZE = 5
+        WINDOW_SIZE = 8
 
         for i in range(self.max_iterations):
 
