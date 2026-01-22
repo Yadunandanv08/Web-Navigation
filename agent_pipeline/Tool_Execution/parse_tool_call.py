@@ -1,15 +1,22 @@
 import json
 import inspect
 from typing import get_type_hints, Annotated
+import re
 
 def parse_tool_call(tool_call: str) -> dict | None:
     if "<tool_call>" not in tool_call or "</tool_call>" not in tool_call:
         return None
 
     try:
-        json_str = tool_call.split("<tool_call>", 1)[1].split("</tool_call>", 1)[0]
+        json_str = tool_call.split("<tool_call>", 1)[1].split("</tool_call>", 1)[0].strip()
+        json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
+        json_str = re.sub(r'\\\n\s*', '', json_str)
+        json_str = json_str.replace('\n', ' ')
+
         return json.loads(json_str)
-    except json.JSONDecodeError:
+    
+    except json.JSONDecodeError as e:
+        print(f"JSON Parsing Failed. \nError: {e}\nBad String: {json_str}")
         return None
 
 
