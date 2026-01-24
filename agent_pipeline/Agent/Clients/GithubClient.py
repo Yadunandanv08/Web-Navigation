@@ -1,7 +1,7 @@
 import os
 from typing import List, Dict
 from openai import OpenAI
-from agent_pipeline.Agent.AbstractLLM import AbstractLLMClient
+from agent_pipeline.Agent.Abstactions.AbstractLLM import AbstractLLMClient
 
 
 class GitHubModelsClient(AbstractLLMClient):

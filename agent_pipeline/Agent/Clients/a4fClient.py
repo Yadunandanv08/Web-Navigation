@@ -1,6 +1,6 @@
 import os
 from openai import OpenAI
-from agent_pipeline.Agent.AbstractLLM import AbstractLLMClient
+from agent_pipeline.Agent.Abstactions.AbstractLLM import AbstractLLMClient
 
 class A4FClient(AbstractLLMClient):
 
