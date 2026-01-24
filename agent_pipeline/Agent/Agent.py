@@ -39,7 +39,7 @@ REASONING_INSTRUCTIONS = """
 Detailed reasoning on why you need this tool.
 </thinking>
 <tool_call>
-{{"name": "function-name", "arguments": {{...}}}}
+{"name": "function-name", "arguments": { ... }}
 </tool_call>
 
 **Format 2: Final Answer**
@@ -52,7 +52,7 @@ Reasoning on how you arrived at the answer.
 DIRECT_INSTRUCTIONS = """
 **Format 1: Tool Call**
 <tool_call>
-{{"name": "function-name", "arguments": {{...}}}}
+{"name": "function-name", "arguments": { ... }}
 </tool_call>
 
 **Format 2: Final Answer**
@@ -60,11 +60,10 @@ DIRECT_INSTRUCTIONS = """
 """
 
 class Agent:
-    def __init__(self, llm_client, tools, max_iterations=5, max_steps=5, max_retries=2, reasoning=True, show_thinking=True, system_prompt=None):
+    def __init__(self, llm_client, tools, max_steps=5, max_retries=2, reasoning=True, show_thinking=True, system_prompt=None):
         self.llm_client = llm_client
         self.tools = tools
         self.function_map = {func.__name__: func for func in tools}
-        self.max_iterations = max_iterations
         self.max_steps = max_steps
         self.max_retries = max_retries
         self.reasoning = reasoning
@@ -96,9 +95,9 @@ class Agent:
         else:
             current_format = DIRECT_INSTRUCTIONS
 
-        WINDOW_SIZE = 8
+        WINDOW_SIZE = 10
 
-        for i in range(self.max_iterations):
+        for i in range(self.max_steps):
             
             if scratchpad_log:
                 current_scratchpad = "\n".join(scratchpad_log[-WINDOW_SIZE:])
@@ -150,14 +149,25 @@ class Agent:
                         scratchpad_log.append(f"Observation {i+1}: Error. Tool '{tool_call['name']}' not found.")
                 
                 else:
+                    thought_content = extract_tagged_content(llm_response, "thinking")
+                    
+                    if thought_content:
+                        scratchpad_log.append(f"Observation {i+1}: You provided reasoning but no tool call. Please output a <tool_call> or <final_answer>.")
+                        logger.warn(f"Agent stuck in thinking loop. Nudging...")
+                    
                     self.chat_history.append({"role": "User", "content": user_input})
                     self.chat_history.append({"role": "Assistant", "content": llm_response})
                     return {"final_response": llm_response, "history": scratchpad_log}
 
             except Exception as e:
                 scratchpad_log.append(f"Observation {i+1}: Execution Error: {e}")
+        
+        failure_msg = "I could not complete the task within the given steps."
+        
+        self.chat_history.append({"role": "User", "content": user_input})
+        self.chat_history.append({"role": "Assistant", "content": failure_msg})
 
         return {
-            "final_response": "I could not complete the task within the given steps.",
+            "final_response": failure_msg,
             "history": scratchpad_log
         }
