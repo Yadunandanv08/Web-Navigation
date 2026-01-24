@@ -1,7 +1,19 @@
-ORCHESTRATOR_PROMPT = """
-You are a reliable and intelligent assistant that answers user queries.
+import inspect
+import asyncio
+from typing import List
+from agent_pipeline.Tool_Execution.parse_tool_call import generate_available_tools, parse_tool_call
+from agent_pipeline.utils.parser import extract_tagged_content
+from agent_pipeline.utils.logger import Logger
 
-**User's Goal:**
+logger = Logger()
+
+BASE_INSTRUCTIONS = """
+You are a reliable and intelligent assistant.
+
+**Previous Conversation:**
+{chat_history}
+
+**Current User Goal:**
 {question}
 
 **Available Tools:**
@@ -9,88 +21,98 @@ You are a reliable and intelligent assistant that answers user queries.
 {tools}
 </tools>
 
-**Instructions:**
-1.  Carefully analyze the user's goal and the available tools.
-2.  Review the "Scratchpad" which contains the history of your previous actions and their results.
-3.  Decide on your next step.
-4.  You MUST respond in ONE of the following formats:
-
-IF THE USER QUERY REQUIRES NO THOUGT, PROVIDE FINAL ANSWER DIRECTLY.
-USE TOOLS ONLY IF NECESSARY. DONOT USE TOOLS EVERYWHERE.
-
-**Format 1: If you need to use a tool**
-<thinking>Your reasoning on why you need to use this specific tool to progress towards the goal.</thinking>
-<tool_call>
-{{"name": "function-name", "arguments": {{"arg1": "value1", ...}}}}
-</tool_call>
-
-**Format 2: If you have enough information to answer the user's goal**
-<thinking>Your reasoning on how you arrived at the final answer based on the scratchpad.</thinking>
-<final_answer>The complete and final answer to the user's question.</final_answer>
-
-**Scratchpad (Your Work History):**
+**Scratchpad (Current Task Progress):**
 {scratchpad}
+
+**Instructions:**
+1. Analyze the goal, history, and tools.
+2. Review the Scratchpad to see what you have already done for THIS goal.
+3. Respond in ONE of the valid formats below.
+4. If tool call fails, retry only {max_retries} times before giving up.
+
+{format_instructions}
 """
 
+REASONING_INSTRUCTIONS = """
+**Format 1: If you need to use a tool**
+<thinking>
+Detailed reasoning on why you need this tool.
+</thinking>
+<tool_call>
+{{"name": "function-name", "arguments": {{...}}}}
+</tool_call>
 
-import os
-import json
-from google import genai
-from dotenv import load_dotenv
-from typing import List, Dict
-import inspect
-import asyncio
+**Format 2: Final Answer**
+<thinking>
+Reasoning on how you arrived at the answer.
+</thinking>
+<final_answer>The answer.</final_answer>
+"""
 
-from agent_pipeline.Agent.AbstractLLM import AbstractLLMClient
-from agent_pipeline.Tool_Execution.parse_tool_call import generate_available_tools, parse_tool_call
-from agent_pipeline.utils.parser import extract_tagged_content
-from agent_pipeline.utils.logger import Logger
+DIRECT_INSTRUCTIONS = """
+**Format 1: Tool Call**
+<tool_call>
+{{"name": "function-name", "arguments": {{...}}}}
+</tool_call>
 
-logger = Logger()
-
-load_dotenv()
+**Format 2: Final Answer**
+<final_answer>The answer.</final_answer>
+"""
 
 class Agent:
-    def __init__(self, llm_client: AbstractLLMClient, tools: List, max_iterations: int = 5, show_thinking: bool = True, system_prompt: str = None):
+    def __init__(self, llm_client, tools, max_iterations=5, max_steps=5, max_retries=2, reasoning=True, show_thinking=True, system_prompt=None):
         self.llm_client = llm_client
-        self.model_name = llm_client.model_name
-
         self.tools = tools
         self.function_map = {func.__name__: func for func in tools}
         self.max_iterations = max_iterations
+        self.max_steps = max_steps
+        self.max_retries = max_retries
+        self.reasoning = reasoning
         self.show_thinking = show_thinking
         self.system_prompt = system_prompt
-        
+        self.chat_history = [] 
 
     def _call_llm(self, prompt: str) -> str:
-
         messages = []
-
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
-
         messages.append({"role": "user", "content": prompt})
-
-        response = self.llm_client.generate_response(prompt, messages)
-
-        return response
+        return self.llm_client.generate_response(prompt, messages)
     
-    def run(self, user_input:str):
-        history_log  = []
-        available_tools_str = generate_available_tools(self.tools)
+    def run(self, user_input: str):
+        history_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in self.chat_history[-6:]])
+        if not history_str:
+            history_str = "No previous conversation."
+
+        scratchpad_log = [] 
+
+        if self.tools:
+            available_tools_str = generate_available_tools(self.tools)
+        else:
+            available_tools_str = "No tools available."
+
+        if self.reasoning:
+            current_format = REASONING_INSTRUCTIONS
+        else:
+            current_format = DIRECT_INSTRUCTIONS
 
         WINDOW_SIZE = 8
 
         for i in range(self.max_iterations):
-
-            if history_log:
-                current_scratchpad = "\n".join(history_log[-WINDOW_SIZE:])
+            
+            if scratchpad_log:
+                current_scratchpad = "\n".join(scratchpad_log[-WINDOW_SIZE:])
             else:
-                current_scratchpad = ""
-            prompt = ORCHESTRATOR_PROMPT.format(
-                question=user_input,
-                tools=available_tools_str,
-                scratchpad=current_scratchpad
+                current_scratchpad = "No actions taken yet."
+            
+            prompt = BASE_INSTRUCTIONS.format(
+                chat_history=history_str,
+                question=user_input, 
+                tools=available_tools_str, 
+                scratchpad=current_scratchpad,
+                format_instructions=current_format,
+                max_retries=self.max_retries,
+                max_iterations=self.max_iterations,
             )
 
             llm_response = self._call_llm(prompt)
@@ -102,35 +124,40 @@ class Agent:
 
             final_answer = extract_tagged_content(llm_response, "final_answer")
             if final_answer:
-                return {"final_response": final_answer, "history": history_log}
-            
+                self.chat_history.append({"role": "User", "content": user_input})
+                self.chat_history.append({"role": "Assistant", "content": final_answer})
+                return {"final_response": final_answer, "history": scratchpad_log}
 
             try:
                 tool_call = parse_tool_call(llm_response)
-                if tool_call and tool_call["name"] in self.function_map:
-                    function_to_call = self.function_map[tool_call["name"]]
-                    print(f"Calling tool: {tool_call['name']} with arguments {tool_call['arguments']}")
-                    if inspect.iscoroutinefunction(function_to_call):
-                        tool_result = asyncio.run(function_to_call(**tool_call["arguments"]))
+                
+                if tool_call:
+                    if tool_call["name"] in self.function_map:
+                        function_to_call = self.function_map[tool_call["name"]]
+                        print(f"Calling tool: {tool_call['name']} with arguments {tool_call['arguments']}")
+                        
+                        if inspect.iscoroutinefunction(function_to_call):
+                            tool_result = asyncio.run(function_to_call(**tool_call["arguments"]))
+                        else:
+                            tool_result = function_to_call(**tool_call["arguments"])
+                        
+                        log_entry = (
+                            f"Observation {i+1}: You used tool '{tool_call['name']}' with args {tool_call['arguments']}.\n"
+                            f"Result: {tool_result}" 
+                        )
+                        scratchpad_log.append(log_entry)
                     else:
-                        tool_result = function_to_call(**tool_call["arguments"])
-                    
-                    log_entry = (
-                        f"Observation {i+1}: You used the tool '{tool_call['name']}' with arguments {tool_call['arguments']}.\n"
-                        f"Tool Result: {tool_result}" # 
-                    )
-                    history_log.append(log_entry)
-
+                        scratchpad_log.append(f"Observation {i+1}: Error. Tool '{tool_call['name']}' not found.")
+                
                 else:
-                    history_log.append(f"Observation {i+1}: You tried to call an invalid tool or the format was wrong.")
-
+                    self.chat_history.append({"role": "User", "content": user_input})
+                    self.chat_history.append({"role": "Assistant", "content": llm_response})
+                    return {"final_response": llm_response, "history": scratchpad_log}
 
             except Exception as e:
-                history_log.append(f"Observation {i+1}: An error occurred while trying to call a tool. Error: {e}")
-                print(f"Error parsing tool call: {e}")
+                scratchpad_log.append(f"Observation {i+1}: Execution Error: {e}")
 
         return {
-            "final_response": "I could not complete the task within the given number of steps.",
-            "history": history_log
+            "final_response": "I could not complete the task within the given steps.",
+            "history": scratchpad_log
         }
-    

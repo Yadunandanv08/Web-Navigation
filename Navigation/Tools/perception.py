@@ -27,7 +27,7 @@ class PerceptionTools:
         try:
             raw_snapshot = page.locator("body").aria_snapshot()
         except Exception as e:
-            return f"Error taking snapshot: {str(e)}"
+            return {"status": "error", "reason": str(e)}
         
         self.element_store.clear()
         
@@ -63,7 +63,12 @@ class PerceptionTools:
         }
         for el in self.element_store.all()
     ]
-        return yaml.dump(data, allow_unicode=True, sort_keys=False)
+
+        return {
+            "status": "success",
+            "message": f"{yaml.dump(data, allow_unicode=True, sort_keys=False)}"
+        }
+
 
     def retrieve_element(self, query: str) -> str:
         """Finds the most relevant element IDs based on a natural language query."""

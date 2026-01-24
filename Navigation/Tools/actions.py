@@ -1,53 +1,132 @@
 from Navigation.Browser.manager import BrowserManager
 from Navigation.Tools.element_store import ElementStore
 import json
+from Navigation.normalization.normalize_actions import _normalize_actions, _normalize_ids
+import time
+import random
 
 
 class ActionTools:
     def __init__(self, session: BrowserManager, element_store: ElementStore):
         self.session = session
         self.element_store = element_store
-    
 
-    def click_element(self, element_id):
-        element = self.element_store.get(element_id)
-        page = self.session.get_page()
-
-        try:
-        
-            if element.tag_name == "a" and element.attributes.get("href"):
-                page.goto(element.attributes["href"])
-                return {"status": "success", "method": "goto"}
-
-            
-            locator = page.locator(element.selector).first
-            locator.wait_for(state="visible", timeout=3000)
-            locator.scroll_into_view_if_needed()
-            locator.click(force=True, timeout=3000)
-
-            return {"status": "success", "method": "dom_click"}
-
-        except Exception:
-            if element.text:
-                page.get_by_text(element.text, exact=False).first.click(force=True)
-                return {"status": "success", "method": "text_fallback"}
-
-            raise
-
-
-
-    def type_in_element(self, element_id: str, text: str):
+    def click_elements(self, element_ids: list[str]):
         """
-        Types text into specified element by its ID.
+        Performs click actions on elements by ID.
         """
         try:
-            element = self.element_store.get(element_id)
             page = self.session.get_page()
-            
-            locator = page.locator(element.selector)
-            locator.fill(text)
-            return {"status": "success"}
+            results = []
+
+            element_ids = _normalize_ids(element_ids)
+            wait_range = (0.3, 0.8)
+
+            for element_id in element_ids:
+                
+                try:
+                    element = self.element_store.get(element_id)
+                    
+                    if not element:
+                        raise ValueError(f"Element ID '{element_id}' not found in store.")
+
+                    locator = page.locator(element.selector).first
+                    locator.wait_for(state="visible", timeout=3000)
+                    locator.scroll_into_view_if_needed()
+                    locator.click(timeout=3000)
+
+                    time.sleep(random.uniform(*wait_range))
+
+                    results.append({"element_id": element_id, "status": "ok"})
+
+                except Exception as e:
+                    if 'element' in locals() and element and element.text and len(element.text) < 40 and not element.text.startswith("["):
+                         try:
+                            page.get_by_text(element.text, exact=False).first.click(timeout=3000)
+                            time.sleep(random.uniform(*wait_range))
+                            results.append({
+                                "element_id": element_id,
+                                "status": "ok",
+                                "method": "text_fallback"
+                            })
+                         except Exception as fallback_e:
+                             results.append({
+                                "element_id": element_id,
+                                "status": "error",
+                                "reason": f"Standard failed: {str(e)}, Fallback failed: {str(fallback_e)}"
+                            })
+                    else:
+                        results.append({
+                            "element_id": element_id,
+                            "status": "error",
+                            "reason": str(e)
+                        })
+
+            return {
+                "status": "partial" if any(r["status"] == "error" for r in results) else "ok",
+                "results": results
+            }
+
         except Exception as e:
+            print(e)
+            return {"status": "error", "reason": str(e)}
+
+        
+    def type_in_elements(self, actions: list[dict]):
+        """
+        Types specified text into a list of elements as per element id.
+        """
+        try:
+            page = self.session.get_page()
+            results = []
+
+            actions = _normalize_actions(actions)
+            typing_delay_range=(50, 120)
+            field_wait_range=(0.4, 1.0)
+
+            for action in actions:
+                element_id = action.get("element_id", "UNKNOWN")
+
+                try:
+                    if "element_id" not in action or "text" not in action:
+                        raise ValueError("Action missing 'element_id' or 'text' key")
+
+                    text = action["text"]
+                    element = self.element_store.get(element_id)
+
+                    if not element:
+                        raise ValueError(f"Element ID '{element_id}' not found in store.")
+
+                    locator = page.locator(element.selector).first
+                    locator.wait_for(state="visible", timeout=3000)
+                    locator.scroll_into_view_if_needed()
+
+                    locator.click()
+                    time.sleep(random.uniform(0.1, 0.3))
+
+                    locator.fill("")
+                    locator.type(text, delay=random.randint(*typing_delay_range))
+
+                    time.sleep(random.uniform(*field_wait_range))
+
+                    results.append({
+                        "element_id": element_id,
+                        "status": "ok"
+                    })
+
+                except Exception as e:
+                    results.append({
+                        "element_id": element_id,
+                        "status": "error",
+                        "reason": str(e)
+                    })
+
+            return {
+                "status": "partial" if any(r["status"] == "error" for r in results) else "ok",
+                "results": results
+            }
+        except Exception as e:
+            print(e)
             return {"status": "error", "reason": str(e)}
 
     def set_date(self, element_id: str, date_str: str):
@@ -150,9 +229,9 @@ class ActionTools:
             e_id = action.get('id')
             try:
                 if a_type == 'click':
-                    results.append(self.click_element(e_id))
+                    results.append(self.click_elements(e_id))
                 elif a_type == 'type':
-                    results.append(self.type_in_element(e_id, action.get('text', '')))
+                    results.append(self.type_in_elements(e_id, action.get('text', '')))
                 elif a_type == 'press_key':
                     results.append(self.press_key(action.get('key', '')))
             except Exception as e:
