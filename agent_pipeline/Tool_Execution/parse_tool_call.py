@@ -4,28 +4,33 @@ from typing import get_type_hints, Annotated
 import re
 
 def parse_tool_call(tool_call: str) -> dict | None:
-    if "<tool_call>" not in tool_call or "</tool_call>" not in tool_call:
+    match = re.search(r'<tool_call>(.*?)</tool_call>', tool_call, re.DOTALL)
+    if not match:
         return None
-
-    try:
-        json_str = tool_call.split("<tool_call>", 1)[1].split("</tool_call>", 1)[0].strip()
-        
-        json_str = re.sub(r'^```json\s*', '', json_str)
-        json_str = re.sub(r'^```\s*', '', json_str)
-        json_str = re.sub(r'\s*```$', '', json_str)
-        
-        json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
-        json_str = re.sub(r'\\\n\s*', '', json_str)
-        json_str = json_str.replace('\n', ' ')
-
-        if json_str.startswith("{{") and json_str.endswith("}}"):
-            json_str = json_str[1:-1]
-
-        return json.loads(json_str)
     
-    except json.JSONDecodeError as e:
-        print(f"JSON Parsing Failed.\nError: {e}\nBad String: {json_str}")
+    raw_content = match.group(1).strip()
+    
+    clean_content = re.sub(r'^```\w*\s*', '', raw_content)
+    clean_content = re.sub(r'\s*```$', '', clean_content) 
+    
+    start_index = clean_content.find('{')
+    end_index = clean_content.rfind('}')
+    
+    if start_index == -1 or end_index == -1:
+        print(f"JSON Parsing Failed: No JSON object found in tag content: {raw_content}")
         return None
+        
+    json_candidate = clean_content[start_index : end_index + 1]
+    
+    try:
+        return json.loads(json_candidate)
+    except json.JSONDecodeError as e:
+        try:
+            normalized = json_candidate.replace('\n', ' ') 
+            return json.loads(normalized)
+        except:
+            print(f"JSON Parsing Failed.\nError: {e}\nBad String: {json_candidate}")
+            return None
 
 
 def generate_available_tools(tools_list: list) -> str:

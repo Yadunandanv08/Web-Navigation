@@ -37,7 +37,7 @@ class ActionTools:
                     locator = page.locator(element.selector).first
                     locator.wait_for(state="visible", timeout=3000)
                     locator.scroll_into_view_if_needed()
-                    locator.click(timeout=3000)
+                    locator.click(timeout=60000)
 
                     time.sleep(random.uniform(*wait_range))
 
@@ -108,7 +108,7 @@ class ActionTools:
                         raise ValueError(f"Element ID '{id}' not found in store.")
 
                     locator = page.locator(element.selector).first
-                    locator.wait_for(state="visible", timeout=3000)
+                    locator.wait_for(state="visible", timeout=60000)
                     locator.scroll_into_view_if_needed()
 
                     locator.click()

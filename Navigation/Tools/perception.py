@@ -1,15 +1,89 @@
+from pyexpat.errors import messages
 import yaml
+import json
 import re
 from typing import List, Dict, Any, Optional
 
 from Navigation.Browser.manager import BrowserManager
 from Navigation.Tools.Models.element import Element
 from Navigation.Tools.element_store import ElementStore
+from Navigation.DomMemoryManager import DOMAwareMemoryManager
+from agent_pipeline.Agent.Clients.GroqClient import GroqClient
 
 class PerceptionTools:
-    def __init__(self, session: BrowserManager, element_store: ElementStore):
+    def __init__(self, session: BrowserManager, element_store: ElementStore, MemoryManager: Optional[DOMAwareMemoryManager] = None):
         self.session = session
         self.element_store = element_store
+        self.memory_manager = MemoryManager
+
+    def compress_snapshot(
+        self,
+        snapshot: List[Dict],
+        llm_client=None
+    ) -> List[Dict]:
+        
+        try:
+
+            if llm_client is None:
+                llm_client = GroqClient()
+
+            system_prompt = """
+    You are a specialized DOM Compressor for an Agentic AI.
+    Your goal is to reduce token usage by removing "noise" while preserving the "signal" required for navigation and interaction.
+
+    ### INPUT DATA:
+    A raw snapshot of webpage elements (JSON/YAML).
+
+    ### COMPRESSION RULES:
+
+    1. **FILTERING (What to Keep):**
+    - **Interactables:** ALWAYS keep elements with roles: button, link, textbox, checkbox, radio, combobox, listbox, option, img (if clickable).
+    - **Context:** Keep headings or text ONLY if they provide essential labels for a nearby input that has a generic name.
+    - **Status:** Keep elements indicating state (e.g., [disabled], [selected]).
+    - **NOTE:** If any field requires heading or text to understand context, keep that field. Summarize text if possible without losing context. 
+
+    2. **STRUCTURAL INTEGRITY:**
+    - **The Orphan Rule:** If you keep a child element, you MUST keep its `parent` element (by ID).
+    - **Tree Preservation:** Maintain the valid chain of `parent` references.
+
+    3. **MATRIX GROUPING (High Compression):**
+    - **Pattern:** If you see 3+ sibling checkboxes or radios that share the same context but differ only by a specific label (e.g., "Familiar", "Proficient", "Expert"), GROUP them.
+    - **Format:** Return a single object with `role: grouped_choice`, a `context` field (the shared topic), and an `options` dictionary mapping `{id: label}`.
+    - *Example:* Instead of 3 objects, return:
+        `{"role": "grouped_choice", "context": "Cloud Platforms", "parent": "4", "options": {"5": "Familiar", "6": "Proficient", "7": "Expert"}}`
+
+    4. **MINIFICATION:**
+    - **Null Removal:** Remove keys with null/empty values.
+    - **Text Cleaning:**
+        - Remove repetitive prefixes in names (e.g., "Familiar, response for X" -> "Familiar").
+        - Summarize long instructions (e.g., "Please select..." -> "Instruction").
+
+    ### OUTPUT FORMAT:
+    - Return the result in clean **YAML** format.
+    - Do NOT use Markdown code blocks.
+    - Do NOT include conversational text..
+    """
+
+            user_prompt = yaml.safe_dump(snapshot, allow_unicode=True, sort_keys=False)
+
+            response = llm_client.generate_response(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ]
+            )
+
+            cleaned = response.strip()
+            if "```" in cleaned:
+                match = re.search(r"```(?:yaml|json)?(.*?)```", cleaned, re.DOTALL)
+                if match:
+                    cleaned = match.group(1).strip()
+
+            return cleaned
+        except Exception as e:
+            raise ValueError(f"Failed to parse compressed snapshot: {e}")
+
+
 
     def take_snapshot(self) -> str:
         """
@@ -30,21 +104,29 @@ class PerceptionTools:
             {
                 "id": el.id,
                 "role": el.role,
-                "scope": el.scope,
+                # "scope": el.scope,
                 "name": el.name,
                 "text": el.text,
                 "parent": el.parent,
-                "states": el.states,
+                # "states": el.states,
             }
             for el in self.element_store.all()
-        ]
+            ]
+
             with open("snapshot.yaml", "w", encoding="utf-8") as f:
                 yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
 
-            return {
-                "status": "success",
-                "message": f"{yaml.dump(data, allow_unicode=True, sort_keys=False)}"
-            }
+            compressed_snapshot = self.compress_snapshot(
+            snapshot=data,
+            )
+            final_output = (
+                f"status: success\n"
+                f"snapshot:\n"
+                f"{compressed_snapshot}"
+            )
+
+            print(f"Compressed Output to Agent:\n{final_output}...\n")
+            return final_output
         except Exception as e:
             return {"status": "error", "reason": str(e)}
     

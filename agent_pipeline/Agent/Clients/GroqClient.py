@@ -19,8 +19,8 @@ class GroqClient(AbstractLLMClient):
             for m in history
         ]
 
-    def generate_response(self, prompt, history):
-        groq_history = self._convert_history(history)
+    def generate_response(self, messages):
+        groq_history = self._convert_history(messages)
 
         response = self.client.chat.completions.create(
             messages=groq_history,

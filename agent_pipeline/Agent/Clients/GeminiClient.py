@@ -32,8 +32,8 @@ class GeminiClient(AbstractLLMClient):
             
         return gem_history
 
-    def generate_response(self, prompt, history):
-        gem_history = self._convert_history(history)
+    def generate_response(self, messages):
+        gem_history = self._convert_history(messages)
 
         response = self.client.models.generate_content(
             model=self.model_name,
