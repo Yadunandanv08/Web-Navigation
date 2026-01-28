@@ -40,5 +40,7 @@ class GeminiClient(AbstractLLMClient):
             contents=gem_history,
             config=types.GenerateContentConfig(temperature=0)
         )
+        import time
+        time.sleep(10)  # To avoid rate limits
 
         return response.text

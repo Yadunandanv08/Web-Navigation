@@ -121,7 +121,7 @@ class ActionTools:
 
                     results.append({
                         "element_id": id,
-                        "status": "ok"
+                        "status": f"typed in {text} successfully"
                     })
 
                 except Exception as e:
