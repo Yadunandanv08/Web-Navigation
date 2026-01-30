@@ -150,13 +150,13 @@ executor = Agent(
 )
 
 
-while True:
-    user_input = input("YOU: ")
-    if user_input.lower() == 'exit':
-        break
-    response = planner.run(user_input=user_input)
-    logger.info(f"Agent Response: {response}")
-    print("AGENT:", response['final_response'])
+# while True:
+#     user_input = input("YOU: ")
+#     if user_input.lower() == 'exit':
+#         break
+#     response = planner.run(user_input=user_input)
+#     logger.info(f"Agent Response: {response}")
+#     print("AGENT:", response['final_response'])
     
 
 """
@@ -165,8 +165,8 @@ phone: 6238922215, final year student btech cs, i know python and java, aws, azu
 """
 
 
-# navigation_tools.open_page("https://docs.google.com/forms/d/e/1FAIpQLSe_nn_5k-5-GMe5h6J9lF_-G8wuluhGSGWh10frU_nOn7tDOQ/viewform?usp=dialog")
-# perception_tools.take_snapshot()
+navigation_tools.open_page("https://docs.google.com/forms/d/e/1FAIpQLSe_nn_5k-5-GMe5h6J9lF_-G8wuluhGSGWh10frU_nOn7tDOQ/viewform?usp=dialog")
+print(perception_tools.take_snapshot())
 # action_tools.click_elements(["21"])
 # perception_tools.take_snapshot()
 # action_tools.click_elements(["29"])
