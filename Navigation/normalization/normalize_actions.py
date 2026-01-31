@@ -44,69 +44,56 @@ def _normalize_ids(ids) -> list[str]:
 
     return []
 
+
 def _normalize_actions(actions) -> list[dict]:
-
-    if actions is None:
+    if not actions:
         return []
-
-    parsed_actions = []
 
     if isinstance(actions, str):
         actions = _clean_llm_string(actions)
-        
+
         try:
-            parsed_actions = json.loads(actions)
+            actions = json.loads(actions)
         except json.JSONDecodeError:
-            
             try:
-                parsed_actions = ast.literal_eval(actions)
-            except (ValueError, SyntaxError):
-         
-                if ":" in actions:
-                    temp_map = {}
-                    
-                    pairs = [p for p in actions.split(',') if p.strip()]
-                    
-                    for pair in pairs:
-                       
-                        if ":" in pair:
-                            k, v = pair.split(":", 1)
-                            temp_map[k.strip()] = v.strip()
-                    parsed_actions = temp_map
-                else:
-                    raise ValueError(f"Could not parse actions string: {actions}")
-    else:
-        parsed_actions = actions
+                actions = ast.literal_eval(actions)
+            except Exception:
+                raise ValueError(f"Could not parse actions: {actions}")
 
-    final_list = []
+    if isinstance(actions, dict):
+        actions = [actions]
+    elif not isinstance(actions, list):
+        raise ValueError(f"Unsupported actions type: {type(actions)}")
 
-    if isinstance(parsed_actions, dict):
-        if "element_id" in parsed_actions and "text" in parsed_actions:
-            final_list.append(parsed_actions)
-        
-   
-        else:
-            for k, v in parsed_actions.items():
-                final_list.append({"element_id": str(k), "text": str(v)})
-    
-    elif isinstance(parsed_actions, list):
-        final_list = parsed_actions
-    
-    else:
-        raise ValueError(f"Unsupported type for actions: {type(parsed_actions)}")
+    normalized = []
 
-    sanitized_results = []
-    for action in final_list:
+    for action in actions:
         if not isinstance(action, dict):
             continue
-            
-        e_id = action.get("element_id")
-        text = action.get("text")
 
-        if e_id is not None and text is not None:
-            sanitized_results.append({
-                "element_id": str(e_id), 
-                "text": str(text)        
+        element_id = (
+            action.get("element_id")
+            or action.get("id")
+            or action.get("elementId")
+        )
+
+        text = (
+            action.get("text")
+            or action.get("value")
+            or action.get("input")
+        )
+
+        if element_id is not None and text is not None:
+            normalized.append({
+                "element_id": str(element_id),
+                "text": str(text)
+            })
+            continue
+
+        for key, value in action.items():
+            normalized.append({
+                "element_id": str(key),
+                "text": str(value)
             })
 
-    return sanitized_results
+    return normalized

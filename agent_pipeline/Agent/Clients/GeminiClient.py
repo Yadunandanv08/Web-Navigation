@@ -3,7 +3,7 @@ from google import genai
 from google.genai import types
 from typing import List, Dict
 
-from agent_pipeline.Agent.AbstractLLM import AbstractLLMClient
+from agent_pipeline.Agent.Abstactions.AbstractLLM import AbstractLLMClient
     
 class GeminiClient(AbstractLLMClient):
 

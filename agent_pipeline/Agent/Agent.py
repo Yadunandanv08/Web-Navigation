@@ -1,9 +1,11 @@
 import inspect
 import asyncio
-from typing import List
+from typing import List, Optional
 from agent_pipeline.Tool_Execution.parse_tool_call import generate_available_tools, parse_tool_call
 from agent_pipeline.utils.parser import extract_tagged_content
 from agent_pipeline.utils.logger import Logger
+from agent_pipeline.Agent.Abstactions.AbstractMemory import MemoryManager
+from agent_pipeline.Agent.Memory.standard import SlidingWindowMemory
 
 logger = Logger()
 
@@ -39,7 +41,7 @@ REASONING_INSTRUCTIONS = """
 Detailed reasoning on why you need this tool.
 </thinking>
 <tool_call>
-{{"name": "function-name", "arguments": {{...}}}}
+{"name": "function-name", "arguments": { ... }}
 </tool_call>
 
 **Format 2: Final Answer**
@@ -52,7 +54,7 @@ Reasoning on how you arrived at the answer.
 DIRECT_INSTRUCTIONS = """
 **Format 1: Tool Call**
 <tool_call>
-{{"name": "function-name", "arguments": {{...}}}}
+{"name": "function-name", "arguments": { ... }}
 </tool_call>
 
 **Format 2: Final Answer**
@@ -60,17 +62,20 @@ DIRECT_INSTRUCTIONS = """
 """
 
 class Agent:
-    def __init__(self, llm_client, tools, max_iterations=5, max_steps=5, max_retries=2, reasoning=True, show_thinking=True, system_prompt=None):
+    def __init__(self, llm_client, tools, memory_manager: Optional[MemoryManager] = None, max_steps=5, max_retries=2, reasoning=True, show_thinking=True, system_prompt=None):
         self.llm_client = llm_client
         self.tools = tools
         self.function_map = {func.__name__: func for func in tools}
-        self.max_iterations = max_iterations
         self.max_steps = max_steps
         self.max_retries = max_retries
         self.reasoning = reasoning
         self.show_thinking = show_thinking
         self.system_prompt = system_prompt
-        self.chat_history = [] 
+        
+        if memory_manager:
+            self.memory = memory_manager
+        else:
+            self.memory = SlidingWindowMemory(history_window=6, scratchpad_window=10)
 
     def _call_llm(self, prompt: str) -> str:
         messages = []
@@ -80,12 +85,8 @@ class Agent:
         return self.llm_client.generate_response(prompt, messages)
     
     def run(self, user_input: str):
-        history_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in self.chat_history[-6:]])
-        if not history_str:
-            history_str = "No previous conversation."
-
-        scratchpad_log = [] 
-
+        self.memory.clear_scratchpad() 
+        
         if self.tools:
             available_tools_str = generate_available_tools(self.tools)
         else:
@@ -96,14 +97,10 @@ class Agent:
         else:
             current_format = DIRECT_INSTRUCTIONS
 
-        WINDOW_SIZE = 8
-
-        for i in range(self.max_iterations):
+        for i in range(self.max_steps):
             
-            if scratchpad_log:
-                current_scratchpad = "\n".join(scratchpad_log[-WINDOW_SIZE:])
-            else:
-                current_scratchpad = "No actions taken yet."
+            history_str = self.memory.get_context()
+            current_scratchpad = self.memory.get_scratchpad()
             
             prompt = BASE_INSTRUCTIONS.format(
                 chat_history=history_str,
@@ -124,9 +121,12 @@ class Agent:
 
             final_answer = extract_tagged_content(llm_response, "final_answer")
             if final_answer:
-                self.chat_history.append({"role": "User", "content": user_input})
-                self.chat_history.append({"role": "Assistant", "content": final_answer})
-                return {"final_response": final_answer, "history": scratchpad_log}
+                self.memory.add_message("User", user_input)
+                self.memory.add_message("Assistant", final_answer)
+                return {
+                    "final_response": final_answer, 
+                    "history": self.memory.get_raw_scratchpad()
+                }
 
             try:
                 tool_call = parse_tool_call(llm_response)
@@ -145,19 +145,33 @@ class Agent:
                             f"Observation {i+1}: You used tool '{tool_call['name']}' with args {tool_call['arguments']}.\n"
                             f"Result: {tool_result}" 
                         )
-                        scratchpad_log.append(log_entry)
+                        self.memory.add_scratchpad_entry(log_entry)
                     else:
-                        scratchpad_log.append(f"Observation {i+1}: Error. Tool '{tool_call['name']}' not found.")
+                        self.memory.add_scratchpad_entry(f"Observation {i+1}: Error. Tool '{tool_call['name']}' not found.")
                 
                 else:
-                    self.chat_history.append({"role": "User", "content": user_input})
-                    self.chat_history.append({"role": "Assistant", "content": llm_response})
-                    return {"final_response": llm_response, "history": scratchpad_log}
+                    thought_content = extract_tagged_content(llm_response, "thinking")
+                    
+                    if thought_content:
+                        self.memory.add_scratchpad_entry(f"Observation {i+1}: You provided reasoning but no tool call. Please output a <tool_call> or <final_answer>.")
+                        logger.warn(f"Agent stuck in thinking loop. Nudging...")
+                    
+                    self.memory.add_message("User", user_input)
+                    self.memory.add_message("Assistant", llm_response)
+                    return {
+                        "final_response": llm_response, 
+                        "history": self.memory.get_raw_scratchpad()
+                    }
 
             except Exception as e:
-                scratchpad_log.append(f"Observation {i+1}: Execution Error: {e}")
+                self.memory.add_scratchpad_entry(f"Observation {i+1}: Execution Error: {e}")
+        
+        failure_msg = "I could not complete the task within the given steps."
+        
+        self.memory.add_message("User", user_input)
+        self.memory.add_message("Assistant", failure_msg)
 
         return {
-            "final_response": "I could not complete the task within the given steps.",
-            "history": scratchpad_log
+            "final_response": failure_msg,
+            "history": self.memory.get_raw_scratchpad()
         }

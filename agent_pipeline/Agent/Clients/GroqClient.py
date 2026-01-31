@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from groq import Groq
 from typing import List, Dict
-from agent_pipeline.Agent.AbstractLLM import AbstractLLMClient
+from agent_pipeline.Agent.Abstactions.AbstractLLM import AbstractLLMClient
 
 load_dotenv()
 

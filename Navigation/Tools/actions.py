@@ -13,7 +13,11 @@ class ActionTools:
 
     def click_elements(self, element_ids: list[str]):
         """
-        Performs click actions on elements by ID.
+            Clicks on a list of web elements identified by their unique IDs.
+            
+            Args:
+                element_ids (list[str]): A list of EXACT integer IDs found by the perception agent.
+                                        Example: ['12', '45', '88']
         """
         try:
             page = self.session.get_page()
@@ -23,6 +27,7 @@ class ActionTools:
             wait_range = (0.3, 0.8)
 
             for element_id in element_ids:
+                time.sleep(0.5)
                 
                 try:
                     element = self.element_store.get(element_id)
@@ -61,6 +66,7 @@ class ActionTools:
                             "status": "error",
                             "reason": str(e)
                         })
+            time.sleep(0.5)
 
             return {
                 "status": "partial" if any(r["status"] == "error" for r in results) else "ok",
@@ -69,13 +75,17 @@ class ActionTools:
 
         except Exception as e:
             print(e)
-            return {"status": "error", "reason": str(e)}
+            return {"status": "error", "reason": str(e)}    
 
         
     def type_in_elements(self, actions: list[dict]):
         """
-        Types specified text into a list of elements as per element id.
-        """
+    Types text into specified fields.
+    
+    Args:
+        actions (list[dict]): A list of dictionaries where each dict has "element_id" and "text".
+                              Example: [{"element_id": "5", "text": "John"}, {"element_id": "7", "text": "Doe"}]
+    """
         try:
             page = self.session.get_page()
             results = []
@@ -85,17 +95,18 @@ class ActionTools:
             field_wait_range=(0.4, 1.0)
 
             for action in actions:
-                element_id = action.get("element_id", "UNKNOWN")
+                time.sleep(0.5)
+                id = action.get("element_id", "UNKNOWN")
 
                 try:
                     if "element_id" not in action or "text" not in action:
                         raise ValueError("Action missing 'element_id' or 'text' key")
 
                     text = action["text"]
-                    element = self.element_store.get(element_id)
+                    element = self.element_store.get(id)
 
                     if not element:
-                        raise ValueError(f"Element ID '{element_id}' not found in store.")
+                        raise ValueError(f"Element ID '{id}' not found in store.")
 
                     locator = page.locator(element.selector).first
                     locator.wait_for(state="visible", timeout=3000)
@@ -110,13 +121,13 @@ class ActionTools:
                     time.sleep(random.uniform(*field_wait_range))
 
                     results.append({
-                        "element_id": element_id,
+                        "element_id": id,
                         "status": "ok"
                     })
 
                 except Exception as e:
                     results.append({
-                        "element_id": element_id,
+                        "element_id": id,
                         "status": "error",
                         "reason": str(e)
                     })

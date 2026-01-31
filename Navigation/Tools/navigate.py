@@ -22,14 +22,16 @@ class NavigationTools:
                 wait_until="domcontentloaded",
                 timeout=60000
             )
-            return {"status": "ok"}
+            return {"status": "ok",
+                    "message": f"Page opened: {url}"
+                }
 
         except Exception as e:
             return {"status": "error", "reason": str(e)}
         
-    def close_browser(self):
-        """
-        Closes the browser session.
-        """
-        self.session.close()
+    # def close_browser(self):
+    #     """
+    #     Closes the browser session.
+    #     """
+    #     self.session.close()
         
