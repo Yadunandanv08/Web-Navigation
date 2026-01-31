@@ -12,10 +12,10 @@ class A4FClient(AbstractLLMClient):
         )
         self.model_name = model_name or os.getenv("A4F_MODEL")
 
-    def generate_response(self, prompt, history):
+    def generate_response(self, messages):
         
         formatted_messages = []
-        for msg in history:
+        for msg in messages:
             role = msg["role"].lower()
             
             if role == "model": 

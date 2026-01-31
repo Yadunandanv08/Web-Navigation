@@ -21,8 +21,8 @@ class OpenRouterClient(AbstractLLMClient):
             for m in history
         ]
 
-    def generate_response(self, prompt, history):
-        messages = self._convert_history(history)
+    def generate_response(self, messages):
+        messages = self._convert_history(messages)
 
         payload = {
             "model": self.model_name,

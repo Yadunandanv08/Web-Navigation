@@ -28,11 +28,8 @@ class GitHubModelsClient(AbstractLLMClient):
             for msg in history
         ]
 
-    def generate_response(self, prompt: str, history: List[Dict]) -> str:
-        messages = self._convert_history(history)
-
-        if not messages or messages[-1]["content"] != prompt:
-            messages.append({"role": "user", "content": prompt})
+    def generate_response(self, messages: List[Dict]) -> str:
+        messages = self._convert_history(messages)
 
         response = self.client.chat.completions.create(
             model=self.model_name,

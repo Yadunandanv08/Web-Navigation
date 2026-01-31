@@ -10,45 +10,49 @@ from agent_pipeline.Agent.Memory.standard import SlidingWindowMemory
 logger = Logger()
 
 BASE_INSTRUCTIONS = """
-You are a reliable and intelligent assistant.
+You are a precise agent.
 
 **Previous Conversation:**
-{chat_history}
+__CHAT_HISTORY__
 
 **Current User Goal:**
-{question}
+__QUESTION__
 
 **Available Tools:**
 <tools>
-{tools}
+__TOOLS__
 </tools>
 
 **Scratchpad (Current Task Progress):**
-{scratchpad}
+__SCRATCHPAD__
 
-**Instructions:**
+**CRITICAL RULES:**
 1. Analyze the goal, history, and tools.
-2. Review the Scratchpad to see what you have already done for THIS goal.
-3. Respond in ONE of the valid formats below.
-4. If tool call fails, retry only {max_retries} times before giving up.
+2. Review the Scratchpad to see what has already been done.
+3. **DO NOT** output any conversational text. Use ONLY the tags below.
+4. **DECISION PROTOCOL:**
+   - If you need to use a tool -> Use **Format 1 (Tool Call)**.
+   - If you have completed the instruction or need to stop -> Use **Format 2 (Final Answer)**.
+   - **NEVER** use both in the same response.
 
-{format_instructions}
+__FORMAT_INSTRUCTIONS__
 """
 
 REASONING_INSTRUCTIONS = """
 **Format 1: If you need to use a tool**
 <thinking>
-Detailed reasoning on why you need this tool.
+Brief reasoning on why you need this tool.
 </thinking>
 <tool_call>
 {"name": "function-name", "arguments": { ... }}
 </tool_call>
+*Note: Do NOT wrap the JSON in markdown code blocks (```).*
 
-**Format 2: Final Answer**
+**Format 2: Final Answer (Mission Complete or Question Answered)**
 <thinking>
 Reasoning on how you arrived at the answer.
 </thinking>
-<final_answer>The answer.</final_answer>
+<final_answer>The specific answer or instruction.</final_answer>
 """
 
 DIRECT_INSTRUCTIONS = """
@@ -82,10 +86,9 @@ class Agent:
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
         messages.append({"role": "user", "content": prompt})
-        return self.llm_client.generate_response(prompt, messages)
+        return self.llm_client.generate_response(messages)
     
-    def run(self, user_input: str):
-        self.memory.clear_scratchpad() 
+    def run(self, user_input: str): 
         
         if self.tools:
             available_tools_str = generate_available_tools(self.tools)
@@ -102,6 +105,7 @@ class Agent:
             history_str = self.memory.get_context()
             current_scratchpad = self.memory.get_scratchpad()
             
+<<<<<<< HEAD
             prompt = BASE_INSTRUCTIONS.format(
                 chat_history=history_str,
                 question=user_input, 
@@ -111,8 +115,18 @@ class Agent:
                 max_retries=self.max_retries,
                 max_iterations=self.max_iterations,
             )
+=======
+            prompt = BASE_INSTRUCTIONS.replace("__CHAT_HISTORY__", history_str) \
+                                      .replace("__QUESTION__", user_input) \
+                                      .replace("__TOOLS__", available_tools_str) \
+                                      .replace("__SCRATCHPAD__", current_scratchpad) \
+                                      .replace("__FORMAT_INSTRUCTIONS__", current_format)
+>>>>>>> 87d0d3cf237e2d799a91b75e72699a7a3c9939f0
 
             llm_response = self._call_llm(prompt)
+            if not llm_response or not llm_response.strip():
+                self.memory.add_scratchpad_entry(f"Observation {i+1}: Error. You returned an empty response. Please output a valid <tool_call> or <final_answer>.")
+                continue
 
             if self.show_thinking:
                 thinking_process = extract_tagged_content(llm_response, "thinking")
@@ -150,18 +164,8 @@ class Agent:
                         self.memory.add_scratchpad_entry(f"Observation {i+1}: Error. Tool '{tool_call['name']}' not found.")
                 
                 else:
-                    thought_content = extract_tagged_content(llm_response, "thinking")
-                    
-                    if thought_content:
-                        self.memory.add_scratchpad_entry(f"Observation {i+1}: You provided reasoning but no tool call. Please output a <tool_call> or <final_answer>.")
-                        logger.warn(f"Agent stuck in thinking loop. Nudging...")
-                    
-                    self.memory.add_message("User", user_input)
-                    self.memory.add_message("Assistant", llm_response)
-                    return {
-                        "final_response": llm_response, 
-                        "history": self.memory.get_raw_scratchpad()
-                    }
+                    self.memory.add_scratchpad_entry(f"Observation {i+1}: Error. Unrecognized format. Please ensure you use <tool_call> or <final_answer> tags.")
+                    continue
 
             except Exception as e:
                 self.memory.add_scratchpad_entry(f"Observation {i+1}: Execution Error: {e}")

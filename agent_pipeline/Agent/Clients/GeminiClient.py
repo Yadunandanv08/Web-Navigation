@@ -32,13 +32,15 @@ class GeminiClient(AbstractLLMClient):
             
         return gem_history
 
-    def generate_response(self, prompt, history):
-        gem_history = self._convert_history(history)
+    def generate_response(self, messages):
+        gem_history = self._convert_history(messages)
 
         response = self.client.models.generate_content(
             model=self.model_name,
             contents=gem_history,
             config=types.GenerateContentConfig(temperature=0)
         )
+        import time
+        time.sleep(10)  # To avoid rate limits
 
         return response.text

@@ -19,15 +19,17 @@ class GroqClient(AbstractLLMClient):
             for m in history
         ]
 
-    def generate_response(self, prompt, history):
-        groq_history = self._convert_history(history)
+    def generate_response(self, messages):
+        try:
+            groq_history = self._convert_history(messages)
 
-        response = self.client.chat.completions.create(
-            messages=groq_history,
-            model=self.model_name
-        )
+            response = self.client.chat.completions.create(
+                messages=groq_history,
+                model=self.model_name
+            )
 
-        return response.choices[0].message.content
-
+            return response.choices[0].message.content
+        except Exception as e:
+            raise ValueError(f"GroqClient failed to generate response: {e}")
     
     

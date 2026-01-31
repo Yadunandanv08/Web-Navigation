@@ -1,17 +1,51 @@
+from pyexpat.errors import messages
 import yaml
+import json
 import re
 from typing import List, Dict, Any, Optional
 
 from Navigation.Browser.manager import BrowserManager
 from Navigation.Tools.Models.element import Element
 from Navigation.Tools.element_store import ElementStore
+<<<<<<< HEAD
 from Rag.retriever import Retriever
 from Rag.embedder import Embedder
+=======
+from Navigation.DomMemoryManager import DOMAwareMemoryManager
+from agent_pipeline.Agent.Clients.GroqClient import GroqClient
+>>>>>>> 87d0d3cf237e2d799a91b75e72699a7a3c9939f0
 
 class PerceptionTools:
-    def __init__(self, session: BrowserManager, element_store: ElementStore):
+    def __init__(self, session: BrowserManager, element_store: ElementStore, MemoryManager: Optional[DOMAwareMemoryManager] = None):
         self.session = session
         self.element_store = element_store
+        self.memory_manager = MemoryManager
+        
+    def strip_none(self, d: dict) -> dict:
+        return {k: v for k, v in d.items() if v is not None}
+    
+    def format_planner_line(self, el: dict) -> str:
+        """
+        Convert a structured element dict into a compact planner format:
+        id:role|primary_text|flags
+        """
+        el_id = el["id"]
+        role = el["role"]
+
+        primary = el.get("name") or el.get("text") or ""
+
+        if primary and (" " in primary or "|" in primary or ":" in primary):
+            primary = f'"{primary}"'
+
+        parts = [f"{el_id}:{role}|{primary}"]
+
+        parent = el.get("parent")
+        if parent is not None:
+            parts.append(f"p={parent}")
+
+        return "|".join(parts)
+
+
 
         #changes
         self.embedder = Embedder()
@@ -26,6 +60,46 @@ class PerceptionTools:
 
         try:
             raw_snapshot = page.locator("body").aria_snapshot()
+<<<<<<< HEAD
+=======
+            
+            
+            self.element_store.clear()
+            
+            self._parse_and_store(raw_snapshot)
+            
+            data = [
+            self.strip_none({
+                "id": el.id,
+                "role": el.role,
+                # "scope": el.scope,
+                "name": el.name,
+                "text": el.text,
+                "parent": el.parent,
+                # "states": el.states,
+            })
+            for el in self.element_store.all()
+            ]
+
+            planner_snapshot = [
+                self.format_planner_line(el)
+                for el in data
+            ]
+
+
+            with open("snapshot.yaml", "w", encoding="utf-8") as f:
+                yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
+
+            
+            final_output = (
+                f"status: success\n"
+                f"snapshot:\n"
+                f"{planner_snapshot}"
+            )
+
+            # print(f"Compressed Output to Agent:\n{final_output}...\n")
+            return final_output
+>>>>>>> 87d0d3cf237e2d799a91b75e72699a7a3c9939f0
         except Exception as e:
             return {"status": "error", "reason": str(e)}
         
