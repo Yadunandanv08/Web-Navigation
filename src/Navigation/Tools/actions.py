@@ -1,5 +1,6 @@
 from Navigation.Browser.manager import BrowserManager
 from Navigation.Tools.element_store import ElementStore
+import json
 from Navigation.normalization.normalize_actions import _normalize_actions, _normalize_ids
 import time
 import random
@@ -221,3 +222,29 @@ class ActionTools:
 
         except Exception as e:
             return {"status": "error", "reason": str(e)}
+    def execute_batch(self, actions):
+        """
+        Executes a sequence of actions on the page in a single tool call.
+        Format: [{"type": "type", "id": "1", "text": "hello"}, {"type": "click", "id": "2"}]
+        Supported types: 'click', 'type', 'press_key'.
+        """
+        if isinstance(actions, str):
+            try:
+                actions = json.loads(actions)
+            except json.JSONDecodeError:
+                return {"status": "error", "reason": "Invalid JSON format for actions."}
+
+        results = []
+        for action in actions:
+            a_type  = action.get('type')
+            e_id = action.get('id')
+            try:
+                if a_type == 'click':
+                    results.append(self.click_elements(e_id))
+                elif a_type == 'type':
+                    results.append(self.type_in_elements(e_id, action.get('text', '')))
+                elif a_type == 'press_key':
+                    results.append(self.press_key(action.get('key', '')))
+            except Exception as e:
+                results.append({"status": "error", "id": e_id, "reason": str(e)})
+        return results

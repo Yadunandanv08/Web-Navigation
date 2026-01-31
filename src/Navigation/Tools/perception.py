@@ -42,6 +42,10 @@ class PerceptionTools:
 
 
 
+        #changes
+        self.embedder = Embedder()
+        self.retriever = Retriever(self.embedder)
+
     def take_snapshot(self) -> str:
         """
         Takes snapshot of the current page to obtain element
@@ -90,6 +94,52 @@ class PerceptionTools:
             return final_output
         except Exception as e:
             return {"status": "error", "reason": str(e)}
+        
+        self.element_store.clear()
+        
+        self._parse_and_store(raw_snapshot)
+        
+        elements = self.element_store.all()
+        texts_to_index = []
+        metadata = []
+
+     #   summary = []
+        for el in elements:
+            desc = f"Role: {el.role}, Name: {el.name}, Text: {el.text}"
+            texts_to_index.append(desc)
+            metadata.append({"id":el.id,"role":el.role,"name":el.name})
+#
+ #           if el.role in ['textbox', 'combobox', 'button', 'checkbox', 'radio']:
+  #              summary.append(f"- {el.role}: '{el.name or el.text}'")
+
+        self.retriever.index_data(texts_to_index, metadata)
+   #     readable_summary = "\n".join(summary[:15]) # Limit summary size to save tokens
+    #    return f"Snapshot indexed successfully. Discovered elements:\n{readable_summary}\n\nUse retrieve_element for specific IDs."
+
+
+        data = [
+        {
+            "id": el.id,
+            "role": el.role,
+            "scope": el.scope,
+            "name": el.name,
+            "text": el.text,
+            "parent": el.parent,
+            "states": el.states,
+        }
+        for el in self.element_store.all()
+    ]
+
+        return {
+            "status": "success",
+            "message": f"{yaml.dump(data, allow_unicode=True, sort_keys=False)}"
+        }
+
+
+    def retrieve_element(self, query: str) -> str:
+        """Finds the most relevant element IDs based on a natural language query."""
+        results = self.retriever.retrieve(query, top_k=3)
+        return yaml.dump(results, allow_unicode=True)
     
     def _parse_and_store(self, snapshot_text: str) -> None:
         lines = snapshot_text.split('\n')

@@ -44,4 +44,10 @@ class OpenRouterClient(AbstractLLMClient):
         response.raise_for_status()
         data = response.json()
 
+        usage = data.get("usage", {})
+        prompt_tokens = usage.get("prompt_tokens", 0)
+        completion_tokens = usage.get("completion_tokens", 0)
+        total_tokens = usage.get("total_tokens", 0)
+        print(f"Tokens used: {total_tokens} (Prompt: {prompt_tokens}, Completion: {completion_tokens})")
+
         return data["choices"][0]["message"]["content"]

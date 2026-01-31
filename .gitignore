@@ -101,3 +101,4 @@ cython_debug/
 # Junk files
 MCP/
 snapshot.yaml
+src/test/resume-parsing/resumes

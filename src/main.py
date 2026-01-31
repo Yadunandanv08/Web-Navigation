@@ -1,4 +1,6 @@
 import json
+#from Rag.retriever import Retriever
+#from Rag.embedder import Embedder
 from agent_pipeline.Agent.Agent import Agent
 from agent_pipeline.Agent.Clients.GroqClient import GroqClient
 from agent_pipeline.Agent.Clients.GeminiClient import GeminiClient
@@ -19,6 +21,7 @@ import re
 
 session = BrowserManager(headless=False)
 
+memory_manager = WebContext()
 
 navigation_tools = NavigationTools(session)
 element_store = ElementStore()
@@ -29,9 +32,9 @@ action_tools = ActionTools(session, element_store)
 
 logger = Logger()
 
-
 PLANNER_SYSTEM_PROMPT = """
 You are the **Planner**. You are the brain of the operation, responsible for Perception and Strategy.
+>>>>>>> 87d0d3cf237e2d799a91b75e72699a7a3c9939f0
 
 *** YOUR MEMORY CONSTRAINT (CRITICAL) ***
 To save processing power, **OLD DOM SNAPSHOTS ARE AUTOMATICALLY MINIMIZED**.
@@ -128,11 +131,11 @@ planner = Agent(
         navigation_tools.open_page,
         execute_plan,
     ],
+    memory_manager=memory_manager,
     max_steps=50,
     max_retries=5,
     reasoning=True,
     show_thinking=True,
-    memory_manager=planner_memory
 )
 
 executor = Agent(
@@ -164,6 +167,11 @@ Open this google form https://docs.google.com/forms/d/e/1FAIpQLSe_nn_5k-5-GMe5h6
 phone: 6238922215, final year student btech cs, i know python and java, aws, azure, gcp, good with git, and an ml engineer, i expect 1000000 salary. I found this job on linkedin.
 """
 
+#refactored prompt
+"""
+    Open this google form [https://docs.google.com/forms/d/e/1FAIpQLSe_nn_5k-5-GMe5h6J9lF_-G8wuluhGSGWh10frU_nOn7tDOQ/viewform?usp=dialog](https://docs.google.com/forms/d/e/1FAIpQLSe_nn_5k-5-GMe5h6J9lF_-G8wuluhGSGWh10frU_nOn7tDOQ/viewform?usp=dialog) and fill it. here are my personal details:
+ My name is yadunandan, my email is yadunandanv08@gmail.com, phone: 6238922215, and i am a final year student btech cs, i know python and java, aws, azure, gcp, good with git, and an ml engineer, i expect 1000000 salary. i heard about this job opening from linkedin. For now fill these details and skip the rest. submit the form after going through the different sections of the form.
+    """
 
 navigation_tools.open_page("https://docs.google.com/forms/d/e/1FAIpQLSe_nn_5k-5-GMe5h6J9lF_-G8wuluhGSGWh10frU_nOn7tDOQ/viewform?usp=dialog")
 print(perception_tools.take_snapshot())
