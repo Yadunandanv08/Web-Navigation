@@ -105,23 +105,11 @@ class Agent:
             history_str = self.memory.get_context()
             current_scratchpad = self.memory.get_scratchpad()
             
-<<<<<<< HEAD
-            prompt = BASE_INSTRUCTIONS.format(
-                chat_history=history_str,
-                question=user_input, 
-                tools=available_tools_str, 
-                scratchpad=current_scratchpad,
-                format_instructions=current_format,
-                max_retries=self.max_retries,
-                max_iterations=self.max_iterations,
-            )
-=======
             prompt = BASE_INSTRUCTIONS.replace("__CHAT_HISTORY__", history_str) \
                                       .replace("__QUESTION__", user_input) \
                                       .replace("__TOOLS__", available_tools_str) \
                                       .replace("__SCRATCHPAD__", current_scratchpad) \
                                       .replace("__FORMAT_INSTRUCTIONS__", current_format)
->>>>>>> 87d0d3cf237e2d799a91b75e72699a7a3c9939f0
 
             llm_response = self._call_llm(prompt)
             if not llm_response or not llm_response.strip():

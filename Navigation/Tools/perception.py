@@ -7,13 +7,8 @@ from typing import List, Dict, Any, Optional
 from Navigation.Browser.manager import BrowserManager
 from Navigation.Tools.Models.element import Element
 from Navigation.Tools.element_store import ElementStore
-<<<<<<< HEAD
-from Rag.retriever import Retriever
-from Rag.embedder import Embedder
-=======
 from Navigation.DomMemoryManager import DOMAwareMemoryManager
 from agent_pipeline.Agent.Clients.GroqClient import GroqClient
->>>>>>> 87d0d3cf237e2d799a91b75e72699a7a3c9939f0
 
 class PerceptionTools:
     def __init__(self, session: BrowserManager, element_store: ElementStore, MemoryManager: Optional[DOMAwareMemoryManager] = None):
@@ -60,8 +55,6 @@ class PerceptionTools:
 
         try:
             raw_snapshot = page.locator("body").aria_snapshot()
-<<<<<<< HEAD
-=======
             
             
             self.element_store.clear()
@@ -99,7 +92,6 @@ class PerceptionTools:
 
             # print(f"Compressed Output to Agent:\n{final_output}...\n")
             return final_output
->>>>>>> 87d0d3cf237e2d799a91b75e72699a7a3c9939f0
         except Exception as e:
             return {"status": "error", "reason": str(e)}
         
