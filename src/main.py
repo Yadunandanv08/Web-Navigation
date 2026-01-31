@@ -136,7 +136,6 @@ planner = Agent(
     max_retries=5,
     reasoning=True,
     show_thinking=True,
-    memory_manager=planner_memory
 )
 
 executor = Agent(
