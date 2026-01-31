@@ -1,0 +1,93 @@
+'use client';
+
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { 
+  User, 
+  signOut, 
+  onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence
+} from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+
+interface UserProfile {
+  uid: string;
+  email: string;
+  displayName?: string;
+  photoURL?: string;
+  resumeURL?: string;
+  jobTitle?: string;
+  about?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+interface AuthContextType {
+  user: User | null;
+  userProfile: UserProfile | null;
+  loading: boolean;
+  logout: () => Promise<void>;
+  updateUserProfile: (profile: Partial<UserProfile>) => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Set persistence to local
+    setPersistence(auth, browserLocalPersistence).catch(console.error);
+
+    // Subscribe to auth state
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      
+      if (currentUser) {
+        // Create profile from Firebase Auth data
+        // Firestore profile will be created on first register/settings update
+        const defaultProfile: UserProfile = {
+          uid: currentUser.uid,
+          email: currentUser.email || '',
+          displayName: currentUser.displayName || '',
+          photoURL: currentUser.photoURL || ''
+        };
+        
+        setUserProfile(defaultProfile);
+      } else {
+        setUserProfile(null);
+      }
+      
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const logout = async () => {
+    await signOut(auth);
+    setUser(null);
+    setUserProfile(null);
+  };
+
+  const updateUserProfile = (profile: Partial<UserProfile>) => {
+    setUserProfile(prev => prev ? { ...prev, ...profile } : null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, userProfile, loading, logout, updateUserProfile }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
