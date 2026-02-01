@@ -27,12 +27,7 @@ export default function RegisterPage() {
   const { user } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (user) {
-      router.push('/dashboard');
-    }
-  }, [user, router]);
-
+   
   const handleResumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -130,8 +125,7 @@ export default function RegisterPage() {
     if (err.code === 'auth/popup-closed-by-user') {
       errorMessage = 'Popup closed before completing sign in';
     }
-<<<<<<< HEAD
-=======
+ 
 
     if (err.code === 'auth/unauthorized-domain') {
       errorMessage = 'Domain not authorized in Firebase';
@@ -143,20 +137,7 @@ export default function RegisterPage() {
     setLoading(false);
   }
 };
->>>>>>> dcd066567f5a22e6f7c88163d3185483dedae699
-
-    if (err.code === 'auth/unauthorized-domain') {
-      errorMessage = 'Domain not authorized in Firebase';
-    }
-
-    setError(errorMessage);
-    console.log('Google auth error:', err.code);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  
+ 
 
   const handleQuestionnaireSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
