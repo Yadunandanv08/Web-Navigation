@@ -1,11 +1,13 @@
 'use client';
 
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+
 import { Mail, Lock, Loader, Chrome } from 'lucide-react';
 
 export default function LoginPage() {
@@ -23,63 +25,71 @@ export default function LoginPage() {
   }, [user, router]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  e.preventDefault();
+  setError('');
+  setLoading(true);
 
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message || 'Failed to login');
-    } finally {
-      setLoading(false);
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    const user = result.user;
+
+    const userRef = doc(db, 'users', user.uid);
+    const snap = await getDoc(userRef);
+
+    if (!snap.exists()) {
+      await auth.signOut();
+      setError('Account not found. Please register first.');
+      return;
     }
-  };
+
+    router.push('/dashboard');
+  } catch (err: any) {
+    setError(err.message || 'Failed to login');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleGoogleLogin = async () => {
-    setError('');
-    setLoading(true);
+  setError('');
+  setLoading(true);
 
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithRedirect(auth, provider);
-    } catch (err: any) {
-      let errorMessage = err.message || 'Failed to login with Google';
-      
-      if (err.code === 'auth/operation-not-allowed') {
-        errorMessage = 'Google Sign-In is not enabled. Contact support.';
-      }
-      
-      setError(errorMessage);
-      console.log('[v0] Google auth error code:', err.code);
-      setLoading(false);
+  try {
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user;
+
+    // 🔒 Check if user exists in Firestore
+    const userRef = doc(db, 'users', user.uid);
+    const snap = await getDoc(userRef);
+
+    if (!snap.exists()) {
+      await auth.signOut();
+      router.push('/register');
+      return;
     }
-  };
 
-  // Handle redirect result when page loads
-  useEffect(() => {
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          router.push('/dashboard');
-        }
-      } catch (err: any) {
-        let errorMessage = err.message || 'Failed to login with Google';
-        
-        if (err.code === 'auth/unauthorized-domain') {
-          errorMessage = 'Domain not authorized. Add your domain to Firebase Console > Authentication > Authorized domains';
-        }
-        
-        setError(errorMessage);
-        console.log('[v0] Google redirect error:', err.code);
-        setLoading(false);
-      }
-    };
+    router.push('/dashboard');
+  } catch (err: any) {
+    let errorMessage = err.message || 'Failed to login with Google';
 
-    handleRedirectResult();
-  }, [router]);
+    if (err.code === 'auth/popup-closed-by-user') {
+      errorMessage = 'Popup closed before completing sign in';
+    }
+
+    if (err.code === 'auth/unauthorized-domain') {
+      errorMessage = 'Domain not authorized in Firebase';
+    }
+
+    setError(errorMessage);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+ 
 
   if (user) {
     return null;

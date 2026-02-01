@@ -53,81 +53,95 @@ export default function SettingsPage() {
   };
 
   const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
+  const file = e.target.files?.[0];
+  if (!file || !user) return;
 
-    setUploadingResume(true);
-    setMessage('');
+  setUploadingResume(true);
+  setMessage('');
 
-    try {
-      // Delete old resume if exists
-      if (formData.resumeURL) {
-        try {
-          const oldRef = ref(storage, `resumes/${user.uid}/old`);
-          await deleteObject(oldRef).catch(() => {}); // Ignore errors
-        } catch (e) {
-          // Ignore
-        }
-      }
-
-      // Upload new resume
-      const storageRef = ref(storage, `resumes/${user.uid}/${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
-
-      // Update Firestore
-      await updateDoc(doc(db, 'users', user.uid), {
-        resumeURL: downloadURL,
-        updatedAt: new Date()
-      });
-
-      setFormData(prev => ({
-        ...prev,
-        resumeURL: downloadURL,
-        resumeFileName: file.name
-      }));
-
-      setMessage('Resume uploaded successfully!');
-    } catch (err: any) {
-      setMessage('Failed to upload resume: ' + err.message);
-    } finally {
-      setUploadingResume(false);
-    }
-  };
-
-  const handleDeleteResume = async () => {
-    if (!user || !formData.resumeURL) return;
-
-    try {
-      setUploadingResume(true);
-      
-      // Try to delete from storage
+  try {
+    // Delete old resume if exists
+    if (formData.resumeURL) {
       try {
-        const fileRef = ref(storage, `resumes/${user.uid}/${formData.resumeFileName}`);
-        await deleteObject(fileRef);
+        const oldRef = ref(storage, `resumes/${user.uid}/${formData.resumeFileName}`);
+        await deleteObject(oldRef).catch(() => {}); // Ignore if file missing
       } catch (e) {
-        // Resume file might not exist, continue
+        // Ignore
       }
+    }
 
-      // Update Firestore
-      await updateDoc(doc(db, 'users', user.uid), {
+    // Upload new resume
+    const storageRef = ref(storage, `resumes/${user.uid}/${file.name}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+
+    // Save to Firestore (merge ensures other fields are safe)
+    await setDoc(
+      doc(db, 'users', user.uid),
+      {
+        resumeURL: downloadURL,
+        updatedAt: new Date()
+      },
+      { merge: true }
+    );
+
+    setFormData(prev => ({
+      ...prev,
+      resumeURL: downloadURL,
+      resumeFileName: file.name
+    }));
+
+    setMessage('Resume uploaded successfully!');
+  } catch (err: any) {
+    setMessage('Failed to upload resume: ' + err.message);
+  } finally {
+    setUploadingResume(false);
+  }
+};
+
+const handleDeleteResume = async () => {
+  if (!user || !formData.resumeURL) return;
+
+  try {
+    setUploadingResume(true);
+
+    // Delete from Storage
+    try {
+      const fileRef = ref(storage, `resumes/${user.uid}/${formData.resumeFileName}`);
+      await deleteObject(fileRef).catch(() => {}); // Ignore if file missing
+    } catch (e) {
+      // Ignore
+    }
+
+    // Remove from Firestore safely
+    await setDoc(
+      doc(db, 'users', user.uid),
+      {
         resumeURL: '',
         updatedAt: new Date()
-      });
+      },
+      { merge: true }
+    );
 
-      setFormData(prev => ({
-        ...prev,
-        resumeURL: '',
-        resumeFileName: ''
-      }));
+    setFormData(prev => ({
+      ...prev,
+      resumeURL: '',
+      resumeFileName: ''
+    }));
 
-      setMessage('Resume deleted successfully!');
-    } catch (err: any) {
-      setMessage('Failed to delete resume: ' + err.message);
-    } finally {
-      setUploadingResume(false);
-    }
-  };
+    setMessage('Resume deleted successfully!');
+  } catch (err: any) {
+    setMessage('Failed to delete resume: ' + err.message);
+  } finally {
+    setUploadingResume(false);
+  }
+};
+
+
+
+
+
+
 
   const handleSaveChanges = async () => {
     if (!user) return;
