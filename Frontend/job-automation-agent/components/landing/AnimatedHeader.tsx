@@ -28,7 +28,7 @@ export function AnimatedHeader() {
           <a href="#how-it-works" className="text-foreground/70 hover:text-foreground transition">
             How it Works
           </a>
-          <a href="#benefits" className="text-foreground/70 hover:text-foreground transition">
+          <a href="#contact" className="text-foreground/70 hover:text-foreground transition">
             Contact
           </a>
         </nav>

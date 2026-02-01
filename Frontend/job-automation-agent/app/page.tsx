@@ -6,6 +6,8 @@ import { useAuth } from '@/context/AuthContext';
 import { AnimatedHeader } from '@/components/landing/AnimatedHeader';
 import { HeroSection } from '@/components/landing/HeroSection';
 import { FeaturesSection } from '@/components/landing/FeaturesSection';
+import { HowItWorksSection } from '@/components/landing/HowItWorksSection';
+import { ContactSection } from '@/components/landing/ContactSection';
 
 export default function LandingPage() {
   const { user, loading } = useAuth();
@@ -31,6 +33,8 @@ export default function LandingPage() {
       <main>
         <HeroSection />
         <FeaturesSection />
+        <HowItWorksSection />
+      <ContactSection />
         
         {/* CTA Section */}
         <section className="py-20 px-4 bg-gradient-to-r from-primary/10 via-transparent to-accent/10">
