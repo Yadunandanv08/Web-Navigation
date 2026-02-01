@@ -130,6 +130,20 @@ export default function RegisterPage() {
     if (err.code === 'auth/popup-closed-by-user') {
       errorMessage = 'Popup closed before completing sign in';
     }
+<<<<<<< HEAD
+=======
+
+    if (err.code === 'auth/unauthorized-domain') {
+      errorMessage = 'Domain not authorized in Firebase';
+    }
+
+    setError(errorMessage);
+    console.log('Google auth error:', err.code);
+  } finally {
+    setLoading(false);
+  }
+};
+>>>>>>> dcd066567f5a22e6f7c88163d3185483dedae699
 
     if (err.code === 'auth/unauthorized-domain') {
       errorMessage = 'Domain not authorized in Firebase';
@@ -142,42 +156,7 @@ export default function RegisterPage() {
   }
 };
 
-  // Handle redirect result when page loads
-  useEffect(() => {
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          const newUser = result.user;
-
-          // Create user profile in Firestore
-          await setDoc(doc(db, 'users', newUser.uid), {
-            uid: newUser.uid,
-            email: newUser.email,
-            displayName: newUser.displayName || '',
-            photoURL: newUser.photoURL || '',
-            jobTitle: '',
-            about: '',
-            createdAt: new Date(),
-            updatedAt: new Date()
-          }, { merge: true });
-
-          setStep('questionnaire');
-        }
-      } catch (err: any) {
-        let errorMessage = err.message || 'Failed to register with Google';
-        
-        if (err.code === 'auth/unauthorized-domain') {
-          errorMessage = 'Domain not authorized. Add your domain to Firebase Console > Authentication > Authorized domains';
-        }
-        
-        setError(errorMessage);
-        console.log('[v0] Google redirect error:', err.code);
-      }
-    };
-
-    handleRedirectResult();
-  }, []);
+  
 
   const handleQuestionnaireSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
