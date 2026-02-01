@@ -130,6 +130,20 @@ export default function RegisterPage() {
     if (err.code === 'auth/popup-closed-by-user') {
       errorMessage = 'Popup closed before completing sign in';
     }
+<<<<<<< HEAD
+=======
+
+    if (err.code === 'auth/unauthorized-domain') {
+      errorMessage = 'Domain not authorized in Firebase';
+    }
+
+    setError(errorMessage);
+    console.log('Google auth error:', err.code);
+  } finally {
+    setLoading(false);
+  }
+};
+>>>>>>> dcd066567f5a22e6f7c88163d3185483dedae699
 
     if (err.code === 'auth/unauthorized-domain') {
       errorMessage = 'Domain not authorized in Firebase';
