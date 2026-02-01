@@ -101,24 +101,46 @@ export default function RegisterPage() {
   };
 
   const handleGoogleRegister = async () => {
-    setError('');
-    setLoading(true);
+  setError('');
+  setLoading(true);
 
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithRedirect(auth, provider);
-    } catch (err: any) {
-      let errorMessage = err.message || 'Failed to register with Google';
-      
-      if (err.code === 'auth/operation-not-allowed') {
-        errorMessage = 'Google Sign-In is not enabled. Contact support.';
-      }
-      
-      setError(errorMessage);
-      console.log('[v0] Google auth error code:', err.code);
-      setLoading(false);
+  try {
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    const newUser = result.user;
+
+    // Store user in Firestore
+    await setDoc(doc(db, 'users', newUser.uid), {
+      uid: newUser.uid,
+      email: newUser.email,
+      displayName: newUser.displayName || '',
+      photoURL: newUser.photoURL || '',
+      jobTitle: '',
+      about: '',
+      resumeURL: '',
+      provider: 'google',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }, { merge: true });
+
+    router.push('/dashboard');
+  } catch (err: any) {
+    let errorMessage = err.message || 'Failed to register with Google';
+
+    if (err.code === 'auth/popup-closed-by-user') {
+      errorMessage = 'Popup closed before completing sign in';
     }
-  };
+
+    if (err.code === 'auth/unauthorized-domain') {
+      errorMessage = 'Domain not authorized in Firebase';
+    }
+
+    setError(errorMessage);
+    console.log('Google auth error:', err.code);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Handle redirect result when page loads
   useEffect(() => {
