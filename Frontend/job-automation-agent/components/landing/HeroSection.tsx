@@ -46,12 +46,7 @@ export function HeroSection() {
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
             </span>
           </Link>
-          <Link 
-            href="#how-it-works"
-            className="px-8 py-4 border border-primary/40 text-foreground rounded-xl font-semibold hover:bg-primary/5 transition"
-          >
-            Watch Demo
-          </Link>
+          
         </div>
 
         {/* Stats */}
