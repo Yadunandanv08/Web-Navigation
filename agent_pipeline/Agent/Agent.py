@@ -1,7 +1,7 @@
 import inspect
 import asyncio
 from typing import List, Optional
-from agent_pipeline.Tool_Execution.parse_tool_call import generate_available_tools, parse_tool_call
+from agent_pipeline.Tool_Execution.parse_tool_call import generate_available_tools, parse_tool_calls
 from agent_pipeline.utils.parser import extract_tagged_content
 from agent_pipeline.utils.logger import Logger
 from agent_pipeline.Agent.Abstactions.AbstractMemory import MemoryManager
@@ -29,8 +29,9 @@ __SCRATCHPAD__
 **CRITICAL RULES:**
 1. Analyze the goal, history, and tools.
 2. Review the Scratchpad to see what has already been done.
-3. **DO NOT** output any conversational text. Use ONLY the tags below.
-4. **DECISION PROTOCOL:**
+3. **CHECK FOR COMPLETION:** If the Scratchpad shows that the required tool actions have already been completed successfully, **DO NOT** run them again. Instead, take the result from the Observation and output it as your <final_answer>.
+4. **DO NOT** output any conversational text. Use ONLY the tags below.
+5. **DECISION PROTOCOL:**
    - If you need to use a tool -> Use **Format 1 (Tool Call)**.
    - If you have completed the instruction or need to stop -> Use **Format 2 (Final Answer)**.
    - **NEVER** use both in the same response.
@@ -56,9 +57,13 @@ Reasoning on how you arrived at the answer.
 """
 
 DIRECT_INSTRUCTIONS = """
-**Format 1: Tool Call**
+**Format 1: Tool Call (Single or Batch)**
+For efficiency, you can execute multiple actions in a single list:
 <tool_call>
-{"name": "function-name", "arguments": { ... }}
+[
+    {"name": "func1", "arguments": { ... }},
+    {"name": "func2", "arguments": { ... }}
+]
 </tool_call>
 
 **Format 2: Final Answer**
@@ -80,12 +85,24 @@ class Agent:
             self.memory = memory_manager
         else:
             self.memory = SlidingWindowMemory(history_window=6, scratchpad_window=10)
+    
+    def optimize_prompt_whitespace(self, text: str) -> str:
+        
+        lines = [line.strip() for line in text.split('\n')]
+        non_empty_lines = [line for line in lines if line]
+        
+        clean_text = "\n".join(non_empty_lines)
+        
+        return clean_text
 
     def _call_llm(self, prompt: str) -> str:
+
+        optimized_prompt = self.optimize_prompt_whitespace(prompt)
+        optimized_system = self.optimize_prompt_whitespace(self.system_prompt) if self.system_prompt else None
         messages = []
         if self.system_prompt:
-            messages.append({"role": "system", "content": self.system_prompt})
-        messages.append({"role": "user", "content": prompt})
+            messages.append({"role": "system", "content": optimized_system})
+        messages.append({"role": "user", "content": optimized_prompt})
         return self.llm_client.generate_response(messages)
     
     def run(self, user_input: str): 
@@ -130,36 +147,64 @@ class Agent:
                     "history": self.memory.get_raw_scratchpad()
                 }
 
+            # --- FIXED EXECUTION LOOP ---
             try:
-                tool_call = parse_tool_call(llm_response)
+                # 1. Get the LIST of tools
+                tool_calls = parse_tool_calls(llm_response)
                 
-                if tool_call:
-                    if tool_call["name"] in self.function_map:
-                        function_to_call = self.function_map[tool_call["name"]]
-                        print(f"Calling tool: {tool_call['name']} with arguments {tool_call['arguments']}")
+                if tool_calls:
+                    logs = []
+                    stop_sequence = False
+
+                    # 2. Iterate through the list
+                    for idx, tool in enumerate(tool_calls):
+                        t_name = tool.get("name")
+                        t_args = tool.get("arguments", {})
+
+                        if t_name not in self.function_map:
+                            logs.append(f"Action {idx+1}: Error - Tool '{t_name}' not found. SEQUENCE ABORTED.")
+                            stop_sequence = True
+                            break
                         
-                        if inspect.iscoroutinefunction(function_to_call):
-                            tool_result = asyncio.run(function_to_call(**tool_call["arguments"]))
-                        else:
-                            tool_result = function_to_call(**tool_call["arguments"])
+                        # Execute
+                        print(f"Executing {t_name} args={t_args}")
+                        func = self.function_map[t_name]
                         
-                        log_entry = (
-                            f"Observation {i+1}: You used tool '{tool_call['name']}' with args {tool_call['arguments']}.\n"
-                            f"Result: {tool_result}" 
-                        )
-                        self.memory.add_scratchpad_entry(log_entry)
-                    else:
-                        self.memory.add_scratchpad_entry(f"Observation {i+1}: Error. Tool '{tool_call['name']}' not found.")
+                        try:
+                            if inspect.iscoroutinefunction(func):
+                                result = asyncio.run(func(**t_args))
+                            else:
+                                result = func(**t_args)
+                            
+                            # Soft Error Check
+                            if isinstance(result, dict) and result.get('status') == 'error':
+                                logs.append(f"Action {idx+1} ({t_name}): Failed - {result.get('reason')}. SEQUENCE ABORTED.")
+                                stop_sequence = True
+                                break
+
+                            logs.append(f"Action {idx+1} ({t_name}): Success - {result}")
+
+                        except Exception as e:
+                            logs.append(f"Action {idx+1} ({t_name}): Execution Exception - {e}. SEQUENCE ABORTED.")
+                            stop_sequence = True
+                            break
+                    
+                    # 3. Consolidate Log
+                    final_log = "\n".join(logs)
+                    if stop_sequence and len(logs) < len(tool_calls):
+                        skipped = len(tool_calls) - len(logs)
+                        final_log += f"\n(Note: {skipped} subsequent actions were skipped due to previous failure.)"
+                        
+                    self.memory.add_scratchpad_entry(f"Observation {i+1}:\n{final_log}")
                 
                 else:
-                    self.memory.add_scratchpad_entry(f"Observation {i+1}: Error. Unrecognized format. Please ensure you use <tool_call> or <final_answer> tags.")
+                    self.memory.add_scratchpad_entry(f"Observation {i+1}: Error. No valid <tool_call> tags found.")
                     continue
 
             except Exception as e:
                 self.memory.add_scratchpad_entry(f"Observation {i+1}: Execution Error: {e}")
-        
+
         failure_msg = "I could not complete the task within the given steps."
-        
         self.memory.add_message("User", user_input)
         self.memory.add_message("Assistant", failure_msg)
 
