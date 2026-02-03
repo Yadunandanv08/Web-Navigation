@@ -1,153 +1,103 @@
-from pyexpat.errors import messages
-import yaml
-import json
-import re
-from typing import List, Dict, Any, Optional
-
 from Navigation.Browser.manager import BrowserManager
-from Navigation.Tools.Models.element import Element
-from Navigation.Tools.element_store import ElementStore
-from Navigation.DomMemoryManager import DOMAwareMemoryManager
-from agent_pipeline.Agent.Clients.GroqClient import GroqClient
+from Navigation.Tools.Models.element import Element, ElementStore
+from Navigation.Tools.change_observer import ChangeObserver
+from Navigation.Tools.ToolHelpers.perception_helper import _parse_and_store_logic, format_planner_line, strip_none
 
 class PerceptionTools:
-    def __init__(self, session: BrowserManager, element_store: ElementStore, MemoryManager: Optional[DOMAwareMemoryManager] = None):
+    def __init__(self, session: BrowserManager, element_store: ElementStore):
         self.session = session
         self.element_store = element_store
-        self.memory_manager = MemoryManager
-        
-    def strip_none(self, d: dict) -> dict:
-        return {k: v for k, v in d.items() if v is not None}
-    
-    def format_planner_line(self, el: dict) -> str:
-        """
-        Convert a structured element dict into a compact planner format:
-        id:role|primary_text|flags
-        """
-        el_id = el["id"]
-        role = el["role"]
-
-        primary = el.get("name") or el.get("text") or ""
-
-        if primary and (" " in primary or "|" in primary or ":" in primary):
-            primary = f'"{primary}"'
-
-        parts = [f"{el_id}:{role}|{primary}"]
-
-        parent = el.get("parent")
-        if parent is not None:
-            parts.append(f"p={parent}")
-
-        return "|".join(parts)
-
-
+        self.change_observer = ChangeObserver(element_store)
 
     def take_snapshot(self) -> str:
         """
-        Takes snapshot of the current page to obtain element
-        ids for actions or the page summary.
+        Full reset. Clears memory, creates fresh IDs 1..N.
         """
-        page = self.session.get_page()
-
         try:
+            page = self.session.get_page()
             raw_snapshot = page.locator("body").aria_snapshot()
-            
+            # print(raw_snapshot)
             
             self.element_store.clear()
+            fresh_elements = self.change_observer._parse_fresh_dom(raw_snapshot)
             
-            self._parse_and_store(raw_snapshot)
-            
-            data = [
-            self.strip_none({
-                "id": el.id,
-                "role": el.role,
-                # "scope": el.scope,
-                "name": el.name,
-                "text": el.text,
-                "parent": el.parent,
-                # "states": el.states,
-            })
-            for el in self.element_store.all()
-            ]
-
-            planner_snapshot = [
-                self.format_planner_line(el)
-                for el in data
-            ]
-
-
-            with open("snapshot.yaml", "w", encoding="utf-8") as f:
-                yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
-
-            
-            final_output = (
-                f"status: success\n"
-                f"snapshot:\n"
-                f"{planner_snapshot}"
-            )
-
-            # print(f"Compressed Output to Agent:\n{final_output}...\n")
-            return final_output
-        except Exception as e:
-            return {"status": "error", "reason": str(e)}
-    
-    def _parse_and_store(self, snapshot_text: str) -> None:
-        lines = snapshot_text.split('\n')
-        
-        parent_stack: List[tuple[int, str]] = []
-        
-        seen_counters: Dict[tuple, int] = {}
-        
-        pattern = re.compile(r'^(\s*)-\s+(\w+)(?:\s+"([^"]*)")?(?:\s+(.*))?$')
-        
-        element_counter = 1
-
-        for line in lines:
-            if not line.strip(): continue
-
-            match = pattern.match(line)
-            if match:
-                indent_str, role, quoted_name, remainder_text = match.groups()
-                
-                indent_level = len(indent_str)
-
-                while parent_stack and parent_stack[-1][0] >= indent_level:
-                    parent_stack.pop()
-                
-                parent_id = parent_stack[-1][1] if parent_stack else None
-
-                name = quoted_name if quoted_name else ""
-                
-                raw_text = remainder_text.strip() if remainder_text else ""
-                
-                text_content = raw_text if raw_text and raw_text != name else None
-
-                key = (role, name)
-                current_index = seen_counters.get(key, 0)
-                seen_counters[key] = current_index + 1
-                
-                safe_name = name.replace('"', '\\"')
-                
-                if safe_name:
-                    base_locator = f'role={role}[name="{safe_name}"]'
-                else:
-                    base_locator = f'role={role}'
-                
-                precise_locator = f'{base_locator} >> nth={current_index}'
-
-                el_id = str(element_counter)
-                
-                el = Element(
-                    id=el_id,
-                    role=role,
-                    locator=precise_locator,
-                    scope="global",
-                    name=name if name else None,
-                    text=text_content,
-                    parent=parent_id
-                )
-                
+            for i, el in enumerate(fresh_elements, 1):
+                el.id = str(i)
                 self.element_store.add(el)
+            
+            planner_lines = [format_planner_line(el) for el in fresh_elements]
+            print("snapshot:", planner_lines)
+            return (
+                f"status: success\n"
+                f"snapshot_type: full\n"
+                f"elements:\n{planner_lines}"
+            )
+        except Exception as e:
+            return f"status: error\nreason: {str(e)}"
+
+    def observe(self) -> str:
+        try:
+            page = self.session.get_page()
+            raw_snapshot = page.locator("body").aria_snapshot()
+            
+            result = self.change_observer.reconcile(raw_snapshot)
+            
+            final_elements = result["elements"]
+            new_ids = result["new_ids"]
+            updated_ids = result["updated_ids"]
+            removed_count = result["removed_count"]
+            stability = result["stability_score"]
+
+            
+            IS_NAVIGATION = False
+            
+            if stability >= 0.8:
+                IS_NAVIGATION = False
                 
-                parent_stack.append((indent_level, el_id))
-                element_counter += 1
+            elif stability < 0.6:
+                IS_NAVIGATION = True
+                
+            else:
+                 
+                 if removed_count > len(new_ids):
+                     IS_NAVIGATION = True
+
+            if IS_NAVIGATION:
+                self.element_store.clear()
+                for i, el in enumerate(final_elements, 1):
+                    el.id = str(i)
+                    self.element_store.add(el)
+                
+                planner_lines = [format_planner_line(el) for el in final_elements]
+                return (
+                    f"status: success\n"
+                    f"observation: Major page content change detected (Navigation). IDs reset.\n"
+                    f"elements:\n" + "\n".join(planner_lines)
+                )
+
+           
+            self.element_store.clear()
+            for el in final_elements:
+                self.element_store.add(el)
+            
+            parts = []
+            
+            if updated_ids:
+                parts.append(f"Values updated in {len(updated_ids)} fields.")
+
+            if new_ids or removed_count > 0:
+                parts.append(f"Layout updated: {len(new_ids)} new items, {removed_count} removed.")
+                
+                if new_ids:
+                    # Only show new IDs
+                    new_objs = [self.element_store.get(nid) for nid in new_ids]
+                    lines = [format_planner_line(el) for el in new_objs]
+                    parts.append("New Elements (Use these IDs):\n" + "\n".join(lines))
+            
+            if not parts:
+                return "status: success\nobservation: No significant visual changes."
+                
+            return f"status: success\nobservation: {' '.join(parts)}"
+
+        except Exception as e:
+            return f"status: error\nreason: {str(e)}"

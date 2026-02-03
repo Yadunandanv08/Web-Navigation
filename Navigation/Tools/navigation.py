@@ -1,5 +1,5 @@
-from nav2.Browser.manager import BrowserManager
-from nav2.Tools.Models.element import ElementStore
+from Navigation.Browser.manager import BrowserManager
+from Navigation.Tools.Models.element import ElementStore
 
 
 class NavigationTools:

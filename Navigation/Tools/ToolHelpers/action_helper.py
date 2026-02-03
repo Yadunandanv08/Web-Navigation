@@ -1,7 +1,7 @@
 import time
-from nav2.Browser.manager import BrowserManager
-from nav2.Tools.Models.element import ElementStore
-from nav2.Tools.perception import PerceptionTools
+from Navigation.Browser.manager import BrowserManager
+from Navigation.Tools.Models.element import ElementStore
+from Navigation.Tools.perception import PerceptionTools
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 def _observe_and_report(action_results: dict, perception: PerceptionTools) -> dict:

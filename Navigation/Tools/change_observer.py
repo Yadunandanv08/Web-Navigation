@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 import re
-from nav2.Tools.Models.element import Element, ElementStore
+from Navigation.Tools.Models.element import Element, ElementStore
 
 class ChangeObserver:
     def __init__(self, element_store: ElementStore):

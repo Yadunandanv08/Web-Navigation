@@ -101,3 +101,7 @@ cython_debug/
 # Junk files
 MCP/
 snapshot.yaml
+gemini_log.txt
+groq_log.txt
+openrouter_log.txt
+sample_upload.txt
