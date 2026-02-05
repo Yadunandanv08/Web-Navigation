@@ -64,6 +64,7 @@ Complete the task using all the information and infer from data if possible, els
 - Stop when goal achieved or clearly impossible
 """
 
+"""
 unified_agent = Agent(
     llm_client=GeminiClient(),  
     system_prompt=UNIFIED_SYSTEM_PROMPT,
@@ -81,7 +82,7 @@ unified_agent = Agent(
     show_thinking=True,
     memory_manager=shared_memory
 )
-
+"""
 
 # while True:
 #     user_input = input("YOU: ")
@@ -101,6 +102,7 @@ phone: 6238922215, final year student btech cs, i know python and java, aws, azu
 Open this google form https://docs.google.com/forms/d/e/1FAIpQLSeIIOkuFqPagjWMam4HcxOLzgdtYfdWELNhtVombwUrEpXSew/viewform?usp=publish-editor and you will notice a field to upload resume. please upload the resume and submit the form.
 """
 
+"""
 while True:
     user_input = input("YOU: ")
     if user_input.lower() == 'exit':
@@ -109,9 +111,19 @@ while True:
     response = unified_agent.run(user_input=user_input)
     logger.info(f"Response: {response}")
     print("AGENT:", response['final_response'])
+"""
+"""
+navigation_tools.open_page("https://docs.google.com/forms/d/e/1FAIpQLSeIIOkuFqPagjWMam4HcxOLzgdtYfdWELNhtVombwUrEpXSew/viewform?usp=publish-editor")
+perception_tools.take_snapshot()
+print(action_tools.upload_file("7"))
+import time
+time.sleep (2000)
+"""
+navigation_tools.open_page("https://www.linkedin.com/jobs/search/?currentJobId=4357820933&origin=JOBS_HOME_JYMBII")
+import time
 
-# navigation_tools.open_page("https://docs.google.com/forms/d/e/1FAIpQLSeIIOkuFqPagjWMam4HcxOLzgdtYfdWELNhtVombwUrEpXSew/viewform?usp=publish-editor")
-# perception_tools.take_snapshot()
-# print(action_tools.upload_file("7"))
-# import time
-# time.sleep (2000)
+time.sleep(5)
+perception_tools.take_snapshot()
+
+time.sleep (2000)
+

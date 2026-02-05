@@ -16,7 +16,7 @@ class PerceptionTools:
         try:
             page = self.session.get_page()
             raw_snapshot = page.locator("body").aria_snapshot()
-            # print(raw_snapshot)
+            print(raw_snapshot)
             
             self.element_store.clear()
             fresh_elements = self.change_observer._parse_fresh_dom(raw_snapshot)
