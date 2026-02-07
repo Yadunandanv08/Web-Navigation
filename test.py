@@ -185,7 +185,7 @@ for post in postings:
     # 4. Create a NEW Agent instance for THIS specific job
     # This wipes history/scratchpad for a fresh start
     app_agent = Agent(
-        llm_client=OpenRouterClient(),  
+        llm_client=GitHubModelsClient(),  
         tools=application_tools,
         system_prompt=SYSTEM_PROMPT_TEMPLATE, 
         max_steps=10, # Give it enough steps to navigate multi-page forms
@@ -197,18 +197,28 @@ for post in postings:
     
     print(f"Result for {post['job_title']}: {result['final_response']}")
     print("-" * 50)
-""" 
-# 5. Hand off the task to the sub-agent
-import time
-navigation_tools.open_page("https://www.linkedin.com/jobs/search")
-time.sleep(5)
-perception_tools.take_snapshot()
-action_tools.click_elements(['91'])
-time.sleep(3)
-perception_tools.take_snapshot()
-action_tools.click_elements(['16'])
-time.sleep(3)
-perception_tools.take_snapshot()
-action_tools.click_elements(['18'])
 
-"""
+# 5. Hand off the task to the sub-agent
+# import time
+# navigation_tools.open_page("https://www.linkedin.com/jobs/search")
+# time.sleep(5)
+# perception_tools.take_snapshot()
+# action_tools.click_elements(['89'])
+# time.sleep(3)
+# perception_tools.take_snapshot()
+# print(action_tools.click_elements(['16']))
+# time.sleep(3)
+# print(action_tools.click_elements(['18']))
+# time.sleep(3)
+# action_tools.type_in_elements(entries=[{"element_id": "267", "text": "+91 7874134312"}])
+# print(action_tools.click_elements(['271']))
+# action_tools.type_in_elements(entries=[{"element_id": "267", "text": "+91 7874134312"}])
+# perception_tools.take_snapshot()
+# action_tools.upload_file("11")
+# action_tools.click_elements(['16'])
+# perception_tools.take_snapshot()
+# print(action_tools.click_elements(['14']))
+# perception_tools.take_snapshot()
+# print(action_tools.click_elements(['16']))
+# time.sleep(3000)
+
