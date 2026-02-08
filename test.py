@@ -34,6 +34,70 @@ def get_resume_contents()-> str:
 
 resume_text = parse_resume("Resume.pdf")
 
+LINKED_AGENT_PROMPT="""
+You are an expert Job Application Agent. You are applying for a job on behalf of the user.
+
+**USER CONTEXT (IMMUTABLE TRUTH):**
+    "name": "Sudheer Nandhan",
+    "phone": "7874134312", 
+    "phone_country_code": "India (+91)",
+    "email": "mainproject3563@gmail.com",
+    "current_location": "Kerala, India",
+    "willing_to_relocate": "Yes",
+    "total_experience_years": "0", 
+    "current_ctc": "0",
+    "expected_ctc": "1000000",
+    "notice_period_months": "0",
+    "skills": ["Python", "Java", "AWS", "Azure", "GCP", "Git", "Machine Learning"]
+
+**GOAL:** You must complete the ENTIRE application process until the "Application sent" confirmation appears.
+
+**DEFINITION OF DONE (CRITICAL):**
+You are **FORBIDDEN** from outputting a <final_answer> until:
+1. You have clicked "Submit application".
+2. You see the text "Application sent" or a green checkmark indicating success.
+3. You have dismissed the success popup.
+
+**PROTOCOL:**
+1. **Analyze:** Check the snapshot.
+2. **Action:** - If "Easy Apply" -> Click it.
+   - If "Next" or "Continue" or "Review" -> Click it.
+   - If "Submit application" -> Click it.
+   - If Form Fields -> Fill using USER CONTEXT.
+3. **Multi-Page Handling:** - If you click "Next" and the page doesn't change, **CHECK FOR ERRORS** (red text) and fix them.
+   - If you see "Please enter a valid answer", look for empty required fields (marked with *) or dropdowns you missed.
+
+**CRITICAL RULES FOR FORM FILLING:**
+1. **SMART DROPDOWN STRATEGY (Combobox vs Select):**
+   - **Case A: Searchable Fields (Location, Job Title, Skills)**
+     *Identified as:* `combobox` or `textbox` in snapshot.
+     *Action:* 1. **Type** the value (e.g., "Kerala").
+     2. **Wait** for the list to appear.
+     3. **Click** the matching option OR press **Enter**.
+   
+   - **Case B: Fixed Dropdowns (Yes/No, Country Code)**
+     *Identified as:* `listbox` or `select` or has a clear arrow icon.
+     *Action:*
+     1. **Click** the trigger.
+     2. **Select** the option.
+
+2. **PERSISTENCE:**
+   - Do NOT stop after filling one page. 
+   - Do NOT stop after uploading the resume.
+   - You must keep looping (Snapshot -> Action) until the application is SUBMITTED.
+
+3. **NUMERIC FIELDS (CTC/Experience):**
+   - The user context provides "0" or "1000000". 
+   - **RULE:** If the field asks for "Years", enter just the number (e.g., "2").
+   - **RULE:** If the field asks for "Lacs", convert accordingly (e.g., "1000000" -> "10"). 
+   - **ERROR PREVENTION:** Do not add symbols like "," or "$". Use pure decimals (e.g., "2.5").
+
+4. **STRICT ID ENFORCEMENT:** - Use ONLY IDs from the *current* snapshot.
+
+5. **ERRORS:**
+   - If you get stuck on a page for >2 turns, try clicking the "Review" or "Next" button again, or check for missed fields.
+"""
+
 SYSTEM_PROMPT_TEMPLATE = """
 You are an expert Job Application Agent. You are applying for a job on behalf of the user.
 
@@ -153,12 +217,13 @@ navigation_tools.open_page("https://docs.google.com/forms/d/e/1FAIpQLSeIIOkuFqPa
 perception_tools.take_snapshot()
 print(action_tools.upload_file("7"))
 """
+"""
 import time
 navigation_tools.open_page("https://www.linkedin.com/jobs/search")
 
 time.sleep(5)
 perception_tools.take_snapshot()
-
+action_tools.click_elements(['29'])
 # 2. Extract job posting IDs using your new tool
 job_tools = LinkedInTools(element_store)
 postings = job_tools.get_job_posting_ids(limit=5)
@@ -176,7 +241,7 @@ application_tools = [
 
 # 3. Iterate through postings
 for post in postings:
-    print(f"--- Starting Application for: {post['job_title']} ---")
+    print(f"\n\n--- Starting Application for: {post['job_title']} ---\n\n")
     
     # Select the job to load the right-hand pane
     action_tools.click_elements([post['element_id']])
@@ -185,11 +250,12 @@ for post in postings:
     # 4. Create a NEW Agent instance for THIS specific job
     # This wipes history/scratchpad for a fresh start
     app_agent = Agent(
-        llm_client=GitHubModelsClient(),  
+        llm_client=GeminiClient(),  
         tools=application_tools,
-        system_prompt=SYSTEM_PROMPT_TEMPLATE, 
-        max_steps=10, # Give it enough steps to navigate multi-page forms
-        reasoning=False,
+        system_prompt=LINKED_AGENT_PROMPT,
+        max_steps=25, # Give it enough steps to navigate multi-page forms
+        reasoning=True,
+        show_thinking=True,
         memory_manager=DOMAwareMemoryManager(history_window=6, scratchpad_window=8)
     )
     application_task = f"Apply for the current job: {post['job_title']}. Use 'Easy Apply' if available."
@@ -197,28 +263,25 @@ for post in postings:
     
     print(f"Result for {post['job_title']}: {result['final_response']}")
     print("-" * 50)
+    print("\n\n\n")
+"""
+"""
+import time
+navigation_tools.open_page("https://www.linkedin.com/jobs/search")
+time.sleep(5)
+print(perception_tools.take_snapshot())
+time.sleep(5)
+filtering_agent = new Agent(
+    llm_client=GroqClient(),
+    tools=[],
 
-# 5. Hand off the task to the sub-agent
-# import time
-# navigation_tools.open_page("https://www.linkedin.com/jobs/search")
-# time.sleep(5)
-# perception_tools.take_snapshot()
-# action_tools.click_elements(['89'])
-# time.sleep(3)
-# perception_tools.take_snapshot()
-# print(action_tools.click_elements(['16']))
-# time.sleep(3)
-# print(action_tools.click_elements(['18']))
-# time.sleep(3)
-# action_tools.type_in_elements(entries=[{"element_id": "267", "text": "+91 7874134312"}])
-# print(action_tools.click_elements(['271']))
-# action_tools.type_in_elements(entries=[{"element_id": "267", "text": "+91 7874134312"}])
-# perception_tools.take_snapshot()
-# action_tools.upload_file("11")
-# action_tools.click_elements(['16'])
-# perception_tools.take_snapshot()
-# print(action_tools.click_elements(['14']))
-# perception_tools.take_snapshot()
-# print(action_tools.click_elements(['16']))
-# time.sleep(3000)
-
+)
+time.sleep(20)
+print(perception_tools.take_snapshot())
+#time.sleep(5)
+#print(action_tools.click_elements(['14']))
+#time.sleep(3)
+#perception_tools.take_snapshot()
+#time.sleep(3)
+time.sleep(400)
+"""
