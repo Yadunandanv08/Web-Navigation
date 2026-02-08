@@ -169,7 +169,67 @@ class ActionTools:
     #         return _observe_and_report(base, self.perception)
     #     except Exception as e: return {"status": "error", "reason": str(e)}
 
-
+#
+#    def click_elements(self, element_ids: list[str]):
+#        """
+#        Clicks on a list of web elements identified by their unique IDs.
+#        """
+#        results = []
+#        try:
+#            page = self.session.get_page()
+#            
+#            for eid in element_ids:
+#                try:
+#                    el = self.element_store.get(eid)
+#                    if not el: 
+#                        raise ValueError(f"ID {eid} not found")
+#
+#                    loc = page.locator(el.selector).first
+#
+#                    
+#                    if el.role == "option":
+#                        is_native_option = loc.evaluate("el => el.tagName === 'OPTION'")
+#                        
+#                        if is_native_option:
+#                            parent = loc.locator("xpath=..")
+#                            value_to_select = loc.get_attribute("value")
+#                            if value_to_select:
+#                                parent.select_option(value_to_select)
+#                            else:
+#                                text_content = loc.text_content()
+#                                parent.select_option(label=text_content)
+#                                
+#                            results.append({"element_id": eid, "status": "ok", "note": "selected_native_option"})
+#                            continue 
+#
+#                    loc.wait_for(state="visible", timeout=3000)
+#                    loc.scroll_into_view_if_needed()
+#                    loc.click(timeout=5000)
+#                    
+#                    results.append({"element_id": eid, "status": "ok"})
+#
+#                except Exception as e:
+#                    print(e)
+#                    if "resolved to hidden" in str(e) and el.role == "option":
+#                        try:
+#                            print(f"Force clicking hidden custom option {eid}...")
+#                            loc.dispatch_event("click")
+#                            results.append({"element_id": eid, "status": "ok", "note": "force_clicked_hidden"})
+#                            continue
+#                        except:
+#                            print(e)
+#                            pass
+#                    
+#                    results.append({"element_id": eid, "status": "error", "reason": str(e)})
+#            
+#            base = {"status": "partial" if any(r["status"]=="error" for r in results) else "ok", "results": results}
+#            time.sleep(1) 
+#            return _observe_and_report(base, self.perception)
+#
+#        except Exception as e: 
+#            print(e)
+#            return {"status": "error", "reason": str(e)}
+#
     def click_elements(self, element_ids: list[str]):
         """
         Clicks on a list of web elements identified by their unique IDs.
@@ -181,51 +241,53 @@ class ActionTools:
             for eid in element_ids:
                 try:
                     el = self.element_store.get(eid)
-                    if not el: 
-                        raise ValueError(f"ID {eid} not found")
+                    if not el: raise ValueError(f"ID {eid} not found")
 
                     loc = page.locator(el.selector).first
 
-                    
+                    # 1. Handle Native Select Options (Keep your existing logic)
                     if el.role == "option":
-                        is_native_option = loc.evaluate("el => el.tagName === 'OPTION'")
-                        
-                        if is_native_option:
+                        is_native = loc.evaluate("el => el.tagName === 'OPTION'")
+                        if is_native:
                             parent = loc.locator("xpath=..")
-                            value_to_select = loc.get_attribute("value")
-                            if value_to_select:
-                                parent.select_option(value_to_select)
-                            else:
-                                text_content = loc.text_content()
-                                parent.select_option(label=text_content)
-                                
-                            results.append({"element_id": eid, "status": "ok", "note": "selected_native_option"})
-                            continue 
+                            val = loc.get_attribute("value")
+                            if val: parent.select_option(val)
+                            else: parent.select_option(label=loc.text_content())
+                            results.append({"element_id": eid, "status": "ok", "note": "native_select"})
+                            continue
 
-                    loc.wait_for(state="visible", timeout=3000)
-                    loc.scroll_into_view_if_needed()
-                    loc.click(timeout=5000)
+                    # 2. Try Standard Interaction
+                    try:
+                        # Lower timeout to fail faster if blocked
+                        loc.scroll_into_view_if_needed()
+                        loc.click(timeout=2000) 
+                        results.append({"element_id": eid, "status": "ok"})
                     
-                    results.append({"element_id": eid, "status": "ok"})
+                    except Exception as e:
+                        # 3. Fallback: Force Click (Fixes "intercepts pointer events")
+                        print(f"Standard click failed for {eid}: {e}. Retrying with FORCE...")
+                        try:
+                            loc.click(force=True, timeout=2000)
+                            results.append({"element_id": eid, "status": "ok", "note": "force_clicked"})
+                        
+                        except Exception as e2:
+                            # 4. Final Fallback: JS Dispatch (Fixes "resolved to hidden")
+                            print(f"Force click failed for {eid}: {e2}. Dispatching JS click...")
+                            loc.dispatch_event("click")
+                            results.append({"element_id": eid, "status": "ok", "note": "js_dispatched"})
 
                 except Exception as e:
-                    if "resolved to hidden" in str(e) and el.role == "option":
-                        try:
-                            print(f"Force clicking hidden custom option {eid}...")
-                            loc.dispatch_event("click")
-                            results.append({"element_id": eid, "status": "ok", "note": "force_clicked_hidden"})
-                            continue
-                        except:
-                            pass
-                    
+                    print(f"All attempts failed for {eid}: {e}")
                     results.append({"element_id": eid, "status": "error", "reason": str(e)})
             
             base = {"status": "partial" if any(r["status"]=="error" for r in results) else "ok", "results": results}
-            time.sleep(1) 
+            time.sleep(1)
             return _observe_and_report(base, self.perception)
 
-        except Exception as e: 
+        except Exception as e:
             return {"status": "error", "reason": str(e)}
+
+
 
     def type_in_elements(self, entries: list[dict]):
         """
