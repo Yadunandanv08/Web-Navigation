@@ -106,3 +106,4 @@ groq_log.txt
 openrouter_log.txt
 sample_upload.txt
 profile/
+.DS_Store

@@ -15,8 +15,13 @@ class DOMAwareMemoryManager(SlidingWindowMemory):
         return str(hash(dom_content[:500]))[:8]
 
     def add_scratchpad_entry(self, entry: str):
-        
-        snapshot_pattern = r"(Observation \d+:.*?(?:Success|Error).*?)(elements:\s*\n)(.*)"
+        print("\n\n")
+        print(entry)
+        print("\n\n")
+
+        # Matches 'elements:' followed by space OR newline, capturing everything after
+        snapshot_pattern = r"(Observation \d+:.*?(?:Success|Error).*?)(elements:[\s\n]+)(.*)"
+       # snapshot_pattern = r"(Observation \d+:.*?(?:Success|Error).*?)(elements:\s*\n)(.*)"
     
         navigation_pattern = r"(.*observation.*?IDs reset\..*?)(elements:\\n)(.*)"
         
