@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Plus, Paperclip } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { ThinkingAnimation } from './ThinkingAnimation';
-import { sendGeminiMessage } from '@/app/actions/gemini';
+import { sendChatMessage } from '@/app/actions/chat';
 
 interface Message {
   id: string;
@@ -64,13 +64,13 @@ export function ChatInterface() {
         isThinking: true
       }]);
 
-      // Call Gemini API via secure server action
       let response = '';
+
       try {
-        response = await sendGeminiMessage(userMessage.content);
+        response = await sendChatMessage(userMessage.content);
       } catch (error: any) {
-        console.error('Gemini API error:', error);
-        response = generateMockResponse(input);
+        console.error('Backend error:', error);
+        response = 'Sorry, the server is currently unavailable. Please try again.';
       }
 
       // Remove thinking message and add response
@@ -95,26 +95,6 @@ export function ChatInterface() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const generateMockResponse = (userInput: string) => {
-    const responses: { [key: string]: string } = {
-      'google form': 'I can help you with Google Forms! Please share the link to the form, and I\'ll analyze its fields and fill it with your information from the resume you uploaded.',
-      'linkedin': 'For LinkedIn job applications, I can navigate the form fields and fill them with your profile information. Just provide the job posting URL.',
-      'indeed': 'I can handle Indeed applications. Share the job link, and I\'ll fill out the application with your details.',
-      'resume': 'Your resume is ready to be used. I can extract information like your name, email, work experience, skills, and education to fill out job applications automatically.',
-      'skill': 'I can help customize your application based on the job requirements. Which specific skills would you like to highlight?',
-      'interview': 'Would you like me to prepare any interview information that can be used in applications?'
-    };
-
-    const lowerInput = userInput.toLowerCase();
-    for (const [key, response] of Object.entries(responses)) {
-      if (lowerInput.includes(key)) {
-        return response;
-      }
-    }
-
-    return `I've processed your request. Based on what you've shared, I can now help fill job applications for you. Here's what I can do:\n\n✓ Analyze job application forms\n✓ Extract key fields from the form\n✓ Fill fields with your resume information\n✓ Handle multiple form types (Google Forms, LinkedIn, Indeed, custom forms)\n✓ Track all your applications\n\nWhat would you like to do next?`;
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
