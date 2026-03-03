@@ -165,6 +165,7 @@ def apply_to_job_wrapper(job_id: str, job_title: str) -> str:
 orchestrator_tools = [
     navigation_tools.open_page,
     perception_tools.take_snapshot,
+    action_tools.type_in_elements, 
     action_tools.click_elements, # Needed to click the "Easy Apply" filter
     job_tools.get_job_posting_ids,
     apply_to_job_wrapper # The Delegator Tool
@@ -182,17 +183,26 @@ orchestrator = Agent(
 
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
     
-    while True:
-        user_input = input("YOU: ")
-        if user_input.lower() == 'exit':
-            break
+#     while True:
+#         user_input = input("YOU: ")
+#         if user_input.lower() == 'exit':
+#             break
     
-        try:
-            response = orchestrator.run(user_input=user_input)
-            logger.info(f"Response: {response}")
-            print("AGENT:", response['final_response'])
-        except KeyboardInterrupt:
-            print("Stopped by user.")
+#         try:
+#             response = orchestrator.run(user_input=user_input)
+#             logger.info(f"Response: {response}")
+#             print("AGENT:", response['final_response'])
+#         except KeyboardInterrupt:
+#             print("Stopped by user.")
+
+
+
+def run_orchestrator(message: str):
+    try:
+        response = orchestrator.run(user_input=message)
+        return response.get("final_response", "No response")
+    except Exception as e:
+        return f"Agent Error: {str(e)}"
     
